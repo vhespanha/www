@@ -1,0 +1,54 @@
+[settings]
+idiomatic_version_file_enable_tools = ["go"]
+
+[tools]
+watchexec = "latest"
+
+[tasks.generate]
+description = "Generate Go code from templ templates"
+sources = ["**/*.templ"]
+outputs = ["**/*_templ.go"]
+run = "go tool templ generate"
+
+[tasks.build]
+description = "Generate templates and build the site into dist/"
+depends = ["generate"]
+sources = ["go.mod", "**/*.go", "**/*.md", "**/*.css", "**/*.js"]
+run = "go run ./cmd/ssg build -out dist"
+
+[tasks.dev]
+description = "Rebuild on change and serve with live reload on http://localhost:7331"
+depends = ["dev:watch", "dev:serve", "dev:reload"]
+
+[tasks."dev:watch"]
+description = "Rebuild the site whenever sources change"
+hide = true
+run = "mise watch build"
+
+[tasks."dev:serve"]
+description = "Serve dist/ on http://localhost:8080"
+hide = true
+run = "mkdir -p dist && go run ./cmd/ssg serve -out dist -addr localhost:8080"
+
+[tasks."dev:reload"]
+description = "Proxy :8080 on :7331, reloading the browser when dist/ changes"
+hide = true
+run = "mkdir -p dist && go tool templ generate --watch --path dist --watch-pattern '.+\\.(html|css|js)$' --proxy http://localhost:8080 --open-browser=false"
+
+[tasks.fmt]
+description = "Format Go and templ files"
+run = ["go tool templ fmt .", "gofmt -w ."]
+
+[tasks.lint]
+description = "Run go vet, staticcheck and errcheck"
+depends = ["generate"]
+run = [
+  "test -z \"$(gofmt -l .)\" || { gofmt -l .; echo 'run: mise run fmt'; exit 1; }",
+  "go vet ./...",
+  "go tool staticcheck ./...",
+  "go tool errcheck ./...",
+]
+
+[tasks.clean]
+description = "Remove build output and generated templ code"
+run = "rm -rf dist && find . -name '*_templ.go' -delete"
