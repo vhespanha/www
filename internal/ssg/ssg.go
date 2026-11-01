@@ -18,20 +18,25 @@ import (
 	"github.com/a-h/templ"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 	"go.yaml.in/yaml/v3"
 )
 
 // A Page is a component rendered to a file in the output directory.
 type Page struct {
 	// Path is the slash-separated output file, relative to the output
-	// directory. For example, "posts/hello/index.html".
+	// directory. For example, "notes/hello/index.html".
 	Path    string
 	Content templ.Component
 }
 
-// Build replaces the contents of the directory out with the rendered pages.
-func Build(ctx context.Context, out string, pages []Page) error {
+// Build replaces the contents of the directory out with the files of assets
+// and the rendered pages.
+func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 	if err := clearDir(out); err != nil {
+		return err
+	}
+	if err := os.CopyFS(out, assets); err != nil {
 		return err
 	}
 	for _, p := range pages {
@@ -68,17 +73,19 @@ func clearDir(dir string) error {
 	return nil
 }
 
-// A Post is a post parsed from a markdown file.
-type Post struct {
+// A Note is a note parsed from a markdown file.
+type Note struct {
 	// Slug is the name of the source file without its extension.
 	Slug  string
 	Title string
 	Date  time.Time
-	// Body is the post's markdown rendered to HTML.
+	// Minutes is the estimated reading time, at least 1.
+	Minutes int
+	// Body is the note's markdown rendered to HTML.
 	Body templ.Component
 }
 
-// LoadPosts parses the markdown files in fsys matching the glob pattern and
+// LoadNotes parses the markdown files in fsys matching the glob pattern and
 // returns them newest first.
 //
 // Each file must start with a YAML front matter block setting title and date:
@@ -87,55 +94,65 @@ type Post struct {
 //	title: Hello
 //	date: 2026-11-01
 //	---
-func LoadPosts(fsys fs.FS, pattern string) ([]Post, error) {
+func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
 	names, err := fs.Glob(fsys, pattern)
 	if err != nil {
 		return nil, err
 	}
-	posts := make([]Post, 0, len(names))
+	notes := make([]Note, 0, len(names))
 	for _, name := range names {
 		src, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			return nil, err
 		}
-		post, err := parsePost(src)
+		note, err := parseNote(src)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		post.Slug = strings.TrimSuffix(path.Base(name), path.Ext(name))
-		posts = append(posts, post)
+		note.Slug = strings.TrimSuffix(path.Base(name), path.Ext(name))
+		notes = append(notes, note)
 	}
-	slices.SortFunc(posts, func(a, b Post) int {
+	slices.SortFunc(notes, func(a, b Note) int {
 		return cmp.Or(b.Date.Compare(a.Date), cmp.Compare(a.Slug, b.Slug))
 	})
-	return posts, nil
+	return notes, nil
 }
 
-var markdown = goldmark.New(goldmark.WithExtensions(extension.GFM))
+const wordsPerMinute = 230
 
-func parsePost(src []byte) (Post, error) {
+var markdown = goldmark.New(
+	goldmark.WithExtensions(extension.GFM, extension.Footnote),
+	goldmark.WithRendererOptions(html.WithUnsafe()),
+)
+
+func parseNote(src []byte) (Note, error) {
 	front, body, err := splitFrontMatter(src)
 	if err != nil {
-		return Post{}, err
+		return Note{}, err
 	}
 	var meta struct {
 		Title string    `yaml:"title"`
 		Date  time.Time `yaml:"date"`
 	}
 	if err := yaml.Unmarshal(front, &meta); err != nil {
-		return Post{}, fmt.Errorf("front matter: %w", err)
+		return Note{}, fmt.Errorf("front matter: %w", err)
 	}
 	if meta.Title == "" {
-		return Post{}, errors.New("front matter: missing title")
+		return Note{}, errors.New("front matter: missing title")
 	}
 	if meta.Date.IsZero() {
-		return Post{}, errors.New("front matter: missing date")
+		return Note{}, errors.New("front matter: missing date")
 	}
-	var html bytes.Buffer
-	if err := markdown.Convert(body, &html); err != nil {
-		return Post{}, fmt.Errorf("markdown: %w", err)
+	var rendered bytes.Buffer
+	if err := markdown.Convert(body, &rendered); err != nil {
+		return Note{}, fmt.Errorf("markdown: %w", err)
 	}
-	return Post{Title: meta.Title, Date: meta.Date, Body: templ.Raw(html.String())}, nil
+	return Note{
+		Title:   meta.Title,
+		Date:    meta.Date,
+		Minutes: max(1, (len(bytes.Fields(body))+wordsPerMinute-1)/wordsPerMinute),
+		Body:    templ.Raw(rendered.String()),
+	}, nil
 }
 
 func splitFrontMatter(src []byte) (front, body []byte, err error) {

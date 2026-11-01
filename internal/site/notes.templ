@@ -1,0 +1,35 @@
+package site
+
+import (
+	"fmt"
+	"go.vhespanha.dev/www/internal/ssg"
+)
+
+templ Notes(notes []ssg.Note) {
+	@layout("Notes") {
+		<h1>Notes</h1>
+		@noteList(notes)
+	}
+}
+
+templ Note(p ssg.Note) {
+	@layout(p.Title) {
+		<p class="kicker">notes</p>
+		<h1>{ p.Title }</h1>
+		<p class="meta">
+			<time datetime={ isoDate(p.Date) }>{ longDate(p.Date) }</time> &middot; { fmt.Sprintf("%d min read", p.Minutes) }
+		</p>
+		@p.Body
+	}
+}
+
+templ noteList(notes []ssg.Note) {
+	<ul class="note-list">
+		for _, p := range notes {
+			<li>
+				<a href={ templ.URL("/notes/" + p.Slug + "/") }>{ p.Title }</a>
+				<time class="meta" datetime={ isoDate(p.Date) }>{ longDate(p.Date) }</time>
+			</li>
+		}
+	</ul>
+}

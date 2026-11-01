@@ -1,0 +1,85 @@
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+
+@layer base {
+  :root {
+    /* scales every family to crimson pro's x-height; the type scale assumes it */
+    font-size-adjust: ex-height 0.42;
+    font-kerning: normal;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html {
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 21px;
+    line-height: 32px;
+    font-weight: var(--weight-regular);
+
+    @media (width <= 480px) {
+      font-size: 19px;
+      line-height: 29px;
+    }
+  }
+
+  body {
+    margin: 0;
+    padding-block: var(--space-5);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  }
+
+  ::selection {
+    background: var(--ink);
+    color: var(--surface);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none;
+    }
+  }
+
+  a {
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--ink-muted);
+    text-underline-offset: 0.22em;
+    text-decoration-skip-ink: auto;
+
+    &:hover {
+      text-decoration-color: currentColor;
+    }
+  }
+
+  .meta {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+    hyphens: manual;
+  }
+}

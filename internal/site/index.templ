@@ -1,8 +1,26 @@
 package site
 
-templ Index() {
-	@layout("vhespanha.dev") {
-		<h1>Hello World!</h1>
-		<p><a href="/posts/">Posts</a></p>
+import "go.vhespanha.dev/www/internal/ssg"
+
+templ Index(recent []ssg.Note, more bool) {
+	@layout("vhespanha") {
+		<h1>Vinicius Hespanha</h1>
+		<p class="meta">Software engineer &middot; Brazil</p>
+		<p>
+			I build small, careful software for the web. Most of my days go into
+			servers, interfaces and the quiet work between them.
+		</p>
+		<p>
+			This is where I write things down: notes on what I am making, what I am
+			reading and what I would do differently next time.
+		</p>
+		<h2>Writing</h2>
+		@noteList(recent)
+		if more {
+			<p><a href="/notes/">All notes</a></p>
+		}
+		<p class="meta elsewhere">
+			<a href="mailto:mail@vhespanha.dev">Email</a> &middot; <a href="https://github.com/vhespanha">GitHub</a>
+		</p>
 	}
 }
