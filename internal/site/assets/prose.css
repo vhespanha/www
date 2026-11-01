@@ -3,6 +3,7 @@
     max-width: var(--measure);
     margin-inline: auto;
     padding-inline: var(--gutter);
+    padding-block: var(--space-5);
     font-family: var(--font-serif);
     font-size: 21px;
     line-height: 32px;
@@ -101,9 +102,6 @@
       li + li {
         margin-top: var(--space-2);
       }
-    }
-    .elsewhere {
-      margin-top: var(--space-4);
     }
 
     blockquote {

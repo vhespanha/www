@@ -31,7 +31,6 @@
 
   body {
     margin: 0;
-    padding-block: var(--space-5);
   }
 
   @media (prefers-color-scheme: dark) {

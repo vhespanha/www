@@ -1,0 +1,139 @@
+@layer components {
+  :where(.home) :where(h1, h2, p, ul) {
+    margin-block: 0;
+  }
+
+  .banner {
+    display: block;
+    justify-self: end;
+    width: min(100%, 600px);
+    height: auto;
+  }
+  .banner-ink {
+    fill: var(--ink);
+  }
+  .banner-muted {
+    fill: var(--ink-muted);
+  }
+
+  .home {
+    --slab: min(28vw, 400px);
+
+    display: grid;
+    max-width: 1440px;
+    margin-inline: auto;
+    padding-block-end: var(--space-4);
+    font-variant-numeric: oldstyle-nums proportional-nums;
+    font-variant-ligatures: common-ligatures;
+
+    > :not(.banner) {
+      margin-inline: var(--gutter);
+    }
+
+    h1 {
+      font-size: 48px;
+      line-height: 56px;
+      font-weight: var(--weight-regular);
+      letter-spacing: -0.015em;
+      font-variant-numeric: lining-nums;
+      text-wrap: balance;
+
+      @media (width <= 480px) {
+        font-size: 38px;
+        line-height: 44px;
+      }
+    }
+
+    h1 + .meta {
+      margin-top: var(--space-1);
+    }
+
+    h2 {
+      font-size: 30px;
+      line-height: 40px;
+      font-weight: var(--weight-regular);
+      letter-spacing: -0.005em;
+    }
+
+    p {
+      text-wrap: pretty;
+    }
+
+    .note-list {
+      margin-top: var(--space-2);
+      padding: 0;
+      list-style: none;
+
+      li {
+        display: flex;
+        flex-direction: column;
+      }
+      li + li {
+        margin-top: var(--space-2);
+      }
+      + p {
+        margin-top: var(--space-2);
+      }
+    }
+  }
+
+  .home-name {
+    margin-top: var(--space-3);
+  }
+
+  .home-contact {
+    margin-top: var(--space-2);
+  }
+
+  .home-intro {
+    max-width: var(--measure);
+    margin-top: var(--space-3);
+
+    p + p {
+      margin-top: var(--space-2);
+    }
+  }
+
+  .home-notes {
+    margin-top: var(--space-4);
+  }
+
+  /* The notes hang from the slab's left edge: the slab is 208/480 of the banner. */
+  @media (width >= 1000px) {
+    .home {
+      grid-template-columns: minmax(0, 1fr) var(--slab);
+      padding-inline-start: var(--space-4);
+
+      > :not(.banner) {
+        margin-inline: 0;
+      }
+    }
+
+    .banner {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      width: calc(var(--slab) * 480 / 208);
+    }
+
+    .home-name {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: end;
+      margin-top: 0;
+    }
+
+    .home-intro {
+      grid-column: 1;
+      grid-row: 2;
+      max-width: 22em;
+      margin-top: var(--space-4);
+    }
+
+    .home-notes {
+      grid-column: 2;
+      grid-row: 2;
+      margin-top: var(--space-4);
+      padding-inline-end: var(--gutter);
+    }
+  }
+}
