@@ -13,7 +13,7 @@ run = "go tool templ generate"
 [tasks.build]
 description = "Generate templates and build the site into dist/"
 depends = ["generate"]
-sources = ["go.mod", "**/*.go", "**/*.md", "**/*.css", "**/*.js"]
+sources = ["go.mod", "**/*.go", "**/*.md", "internal/site/assets/**/*"]
 run = "go run ./cmd/ssg build -out dist"
 
 [tasks.dev]

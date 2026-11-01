@@ -1,6 +1,6 @@
 package site
 
-templ layout(title string) {
+templ document(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -9,12 +9,21 @@ templ layout(title string) {
 			<title>{ title }</title>
 			<link rel="preload" href="/assets/fonts/crimson-pro-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
 			<link rel="preload" href="/assets/fonts/jost-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
+			<link rel="icon" href="/assets/favicon-32.png" sizes="32x32"/>
+			<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
+			<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"/>
 			<link rel="stylesheet" href="/assets/site.css"/>
 		</head>
 		<body>
-			<article class="prose">
-				{ children... }
-			</article>
+			{ children... }
 		</body>
 	</html>
+}
+
+templ layout(title string) {
+	@document(title) {
+		<article class="prose">
+			{ children... }
+		</article>
+	}
 }

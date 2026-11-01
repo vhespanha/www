@@ -3,24 +3,38 @@ package site
 import "go.vhespanha.dev/www/internal/ssg"
 
 templ Index(recent []ssg.Note, more bool) {
-	@layout("vhespanha") {
-		<h1>Vinicius Hespanha</h1>
-		<p class="meta">Software engineer &middot; Brazil</p>
-		<p>
-			I build small, careful software for the web. Most of my days go into
-			servers, interfaces and the quiet work between them.
-		</p>
-		<p>
-			This is where I write things down: notes on what I am making, what I am
-			reading and what I would do differently next time.
-		</p>
-		<h2>Writing</h2>
-		@noteList(recent)
-		if more {
-			<p><a href="/notes/">All notes</a></p>
-		}
-		<p class="meta elsewhere">
-			<a href="mailto:mail@vhespanha.dev">Email</a> &middot; <a href="https://github.com/vhespanha">GitHub</a>
-		</p>
+	@document("vhespanha") {
+		<main class="home">
+			@banner()
+			<header class="home-name">
+				<h1>Vinicius Hespanha</h1>
+				<p class="meta">Software Engineer &middot; Brazil</p>
+				<div class="home-contact">
+					<p class="meta">Open to new roles. Get in touch.</p>
+					<p class="meta">
+						<a href="mailto:mail@vhespanha.dev">Email</a> &middot;
+						<a href="https://github.com/vhespanha">GitHub</a>
+					</p>
+				</div>
+			</header>
+			<div class="home-intro">
+				<p>
+					I build things, usually small and usually from scratch,
+					mostly to understand how they work.
+				</p>
+				<p>
+					Lately I’ve been turning operational chaos into systems
+					people can rely on. I’d rather build a small, understandable
+					tool than a large, clever one.
+				</p>
+			</div>
+			<section class="home-notes">
+				<h2>Notes</h2>
+				@noteList(recent)
+				if more {
+					<p><a href="/notes/">All notes</a></p>
+				}
+			</section>
+		</main>
 	}
 }
