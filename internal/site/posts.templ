@@ -1,0 +1,35 @@
+package site
+
+import (
+	"go.vhespanha.dev/www/internal/ssg"
+	"time"
+)
+
+templ Posts(posts []ssg.Post) {
+	@layout("Posts - vhespanha.dev") {
+		<h1>Posts</h1>
+		<ul>
+			for _, p := range posts {
+				<li>
+					@date(p.Date)
+					{ " " }
+					<a href={ templ.URL("/posts/" + p.Slug + "/") }>{ p.Title }</a>
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ Post(p ssg.Post) {
+	@layout(p.Title + " - vhespanha.dev") {
+		<article>
+			<h1>{ p.Title }</h1>
+			@date(p.Date)
+			@p.Body
+		</article>
+	}
+}
+
+templ date(t time.Time) {
+	<time datetime={ t.Format(time.DateOnly) }>{ t.Format(time.DateOnly) }</time>
+}

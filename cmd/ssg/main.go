@@ -7,11 +7,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	"go.vhespanha.dev/www/internal/site"
+	"go.vhespanha.dev/www/internal/ssg"
 )
 
 func main() {
@@ -47,6 +51,9 @@ func usage() {
 }
 
 func build(out string) error {
-	// TODO: render the site package into out using the ssg package.
-	return os.MkdirAll(out, 0o755)
+	pages, err := site.Pages()
+	if err != nil {
+		return err
+	}
+	return ssg.Build(context.Background(), out, pages)
 }
