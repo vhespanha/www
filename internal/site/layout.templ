@@ -7,9 +7,14 @@ templ layout(title string) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ title }</title>
+			<link rel="preload" href="/assets/fonts/crimson-pro-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
+			<link rel="preload" href="/assets/fonts/jost-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
+			<link rel="stylesheet" href="/assets/site.css"/>
 		</head>
 		<body>
-			{ children... }
+			<article class="prose">
+				{ children... }
+			</article>
 		</body>
 	</html>
 }

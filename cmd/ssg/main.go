@@ -55,5 +55,5 @@ func build(out string) error {
 	if err != nil {
 		return err
 	}
-	return ssg.Build(context.Background(), out, pages)
+	return ssg.Build(context.Background(), out, pages, site.Assets)
 }
