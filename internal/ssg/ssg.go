@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+	"github.com/evanw/esbuild/pkg/api"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
@@ -30,13 +31,20 @@ type Page struct {
 	Content templ.Component
 }
 
-// Build replaces the contents of the directory out with the files of assets
-// and the rendered pages.
+// stylesheet is the slash-separated path, within the assets, of the stylesheet
+// that imports all the others.
+const stylesheet = "assets/site.css"
+
+// Build replaces the contents of the directory out with the files of assets,
+// with their stylesheets bundled into one, and the rendered pages.
 func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 	if err := clearDir(out); err != nil {
 		return err
 	}
 	if err := os.CopyFS(out, assets); err != nil {
+		return err
+	}
+	if err := bundleCSS(filepath.Join(out, filepath.FromSlash(stylesheet))); err != nil {
 		return err
 	}
 	for _, p := range pages {
@@ -49,6 +57,40 @@ func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 			return err
 		}
 		if err := os.WriteFile(name, buf.Bytes(), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// bundleCSS replaces the stylesheet at entry with a minified bundle of itself
+// and everything it imports, then removes the other stylesheets beside it,
+// which the bundle has made redundant. Fonts stay separate files.
+func bundleCSS(entry string) error {
+	res := api.Build(api.BuildOptions{
+		EntryPoints:      []string{entry},
+		Outfile:          entry,
+		Bundle:           true,
+		MinifyWhitespace: true,
+		MinifySyntax:     true,
+		External:         []string{"*.woff2"},
+		AllowOverwrite:   true,
+		Write:            true,
+		LogLevel:         api.LogLevelSilent,
+	})
+	if len(res.Errors) > 0 {
+		msgs := api.FormatMessages(res.Errors, api.FormatMessagesOptions{})
+		return fmt.Errorf("bundle css: %s", strings.Join(msgs, ""))
+	}
+	others, err := filepath.Glob(filepath.Join(filepath.Dir(entry), "*.css"))
+	if err != nil {
+		return err
+	}
+	for _, name := range others {
+		if name == entry {
+			continue
+		}
+		if err := os.Remove(name); err != nil {
 			return err
 		}
 	}
