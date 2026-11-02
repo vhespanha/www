@@ -1,0 +1,52 @@
+package site
+
+import (
+	"fmt"
+	"time"
+)
+
+type english struct{}
+
+func (english) key() string   { return "" }
+func (english) tag() string   { return "en" }
+func (english) name() string  { return "English" }
+func (english) other() locale { return portuguese{} }
+
+func (english) homeTitle() string   { return "vhespanha" }
+func (english) role() string        { return "Software Engineer · São Paulo, Brazil" }
+func (english) openToRoles() string { return "Open to new roles. Get in touch." }
+func (english) email() string       { return "Email" }
+
+func (english) notesTitle() string  { return "Notes" }
+func (english) notesKicker() string { return "notes" }
+func (english) allNotes() string    { return "All notes" }
+
+func (english) readingTime(minutes int) string { return fmt.Sprintf("%d min read", minutes) }
+func (english) longDate(t time.Time) string    { return t.Format("2 January 2006") }
+
+func (english) inEnglish() string { return "in English" }
+
+func (english) notFoundTitle() string { return "Not found" }
+
+func (english) languageLabel() string { return "Language" }
+func (english) offerText() string     { return "This page is also available in English." }
+func (english) offerAccept() string   { return "Read in English" }
+func (english) offerDismiss() string  { return "Not now" }
+
+templ (english) intro() {
+	<p>
+		I build things, usually small and usually from scratch,
+		mostly to understand how they work.
+	</p>
+	<p>
+		Lately I’ve been turning operational chaos into systems
+		people can rely on. I’d rather build a small, understandable
+		tool than a large, clever one.
+	</p>
+}
+
+templ (english) notFoundBody() {
+	<p>
+		There is nothing at this address. <a href="/">Go back</a>.
+	</p>
+}

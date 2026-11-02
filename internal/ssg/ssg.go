@@ -83,23 +83,40 @@ type Note struct {
 	Minutes int
 	// Body is the note's markdown rendered to HTML.
 	Body templ.Component
+	// Translations holds the note's translations by language. It is nil on a
+	// translation.
+	Translations map[string]Note
 }
 
 // LoadNotes parses the markdown files in fsys matching the glob pattern and
-// returns them newest first.
+// returns the originals newest first, each with its translations attached.
 //
-// Each file must start with a YAML front matter block setting title and date:
+// Each original must start with a YAML front matter block setting title and
+// date:
 //
 //	---
 //	title: Hello
 //	date: 2026-11-01
 //	---
-func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
+//
+// A file named hello.pt.md is the translation of hello.md into the language
+// pt, which must be one of langs. It must set its own title and takes its date
+// from the original; it may repeat that date but not change it. A translation
+// without an original or in an unknown language is an error, so that a typo in
+// a file name cannot silently drop content.
+func LoadNotes(fsys fs.FS, pattern string, langs ...string) ([]Note, error) {
 	names, err := fs.Glob(fsys, pattern)
 	if err != nil {
 		return nil, err
 	}
-	notes := make([]Note, 0, len(names))
+	type translation struct {
+		name, lang string
+		note       Note
+	}
+	var (
+		notes        = make([]Note, 0, len(names))
+		translations []translation
+	)
 	for _, name := range names {
 		src, err := fs.ReadFile(fsys, name)
 		if err != nil {
@@ -109,8 +126,33 @@ func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		note.Slug = strings.TrimSuffix(path.Base(name), path.Ext(name))
+		slug, lang, translated := strings.Cut(strings.TrimSuffix(path.Base(name), path.Ext(name)), ".")
+		note.Slug = slug
+		if translated {
+			if !slices.Contains(langs, lang) {
+				return nil, fmt.Errorf("%s: unknown language %q", name, lang)
+			}
+			translations = append(translations, translation{name, lang, note})
+			continue
+		}
+		if note.Date.IsZero() {
+			return nil, fmt.Errorf("%s: front matter: missing date", name)
+		}
 		notes = append(notes, note)
+	}
+	for _, t := range translations {
+		i := slices.IndexFunc(notes, func(n Note) bool { return n.Slug == t.note.Slug })
+		if i < 0 {
+			return nil, fmt.Errorf("%s: no original %s.md", t.name, t.note.Slug)
+		}
+		if !t.note.Date.IsZero() && !t.note.Date.Equal(notes[i].Date) {
+			return nil, fmt.Errorf("%s: date differs from the original", t.name)
+		}
+		t.note.Date = notes[i].Date
+		if notes[i].Translations == nil {
+			notes[i].Translations = make(map[string]Note)
+		}
+		notes[i].Translations[t.lang] = t.note
 	}
 	slices.SortFunc(notes, func(a, b Note) int {
 		return cmp.Or(b.Date.Compare(a.Date), cmp.Compare(a.Slug, b.Slug))
@@ -139,9 +181,6 @@ func parseNote(src []byte) (Note, error) {
 	}
 	if meta.Title == "" {
 		return Note{}, errors.New("front matter: missing title")
-	}
-	if meta.Date.IsZero() {
-		return Note{}, errors.New("front matter: missing date")
 	}
 	var rendered bytes.Buffer
 	if err := markdown.Convert(body, &rendered); err != nil {
