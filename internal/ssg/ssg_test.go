@@ -50,6 +50,7 @@ func TestLoadNotesInvalid(t *testing.T) {
 		"no title":        "---\ndate: 2026-01-02\n---\n",
 		"no date":         "---\ntitle: A\n---\n",
 		"bad yaml":        "---\ntitle: [\n---\n",
+		"spaced closing":  "---\ntitle: A\ndate: 2026-01-02\n--- \nFirst\n\n---\n\nSecond\n",
 	}
 	for name, src := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -62,6 +63,38 @@ func TestLoadNotesInvalid(t *testing.T) {
 				t.Errorf("error %q does not name the file", err)
 			}
 		})
+	}
+}
+
+func TestLoadNotesInvalidSlug(t *testing.T) {
+	src := []byte("---\ntitle: A\ndate: 2026-01-02\n---\n")
+	for _, name := range []string{"c#-tips.md", "Upper.md", "a b.md"} {
+		_, err := LoadNotes(fstest.MapFS{name: {Data: src}}, "*.md")
+		if err == nil || !strings.HasPrefix(err.Error(), name+": ") {
+			t.Errorf("%s: got error %v", name, err)
+		}
+	}
+}
+
+func TestBuildRefusesProtectedDirs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	wd := filepath.Join(t.TempDir(), "wd")
+	if err := os.Mkdir(wd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(wd)
+	keep := filepath.Join(wd, "keep")
+	if err := os.WriteFile(keep, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, out := range []string{".", "..", home} {
+		if err := Build(context.Background(), out, nil, fstest.MapFS{}); err == nil {
+			t.Errorf("Build(%q): got nil error", out)
+		}
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Errorf("working directory was cleared: %v", err)
 	}
 }
 
