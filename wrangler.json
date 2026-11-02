@@ -1,5 +1,12 @@
 {
   "name": "www",
   "compatibility_date": "2026-11-01",
-  "assets": { "directory": "./dist", "not_found_handling": "404-page" }
+  "assets": { "directory": "./dist", "not_found_handling": "404-page" },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
+    }
+  }
 }
