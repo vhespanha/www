@@ -7,10 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -33,6 +35,9 @@ type Page struct {
 // Build replaces the contents of the directory out with the files of assets
 // and the rendered pages.
 func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
+	if err := checkOut(out); err != nil {
+		return err
+	}
 	if err := clearDir(out); err != nil {
 		return err
 	}
@@ -50,6 +55,33 @@ func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 		}
 		if err := os.WriteFile(name, buf.Bytes(), 0o644); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// checkOut refuses an output directory that contains the working directory or
+// the home directory, since Build deletes everything in it.
+func checkOut(out string) error {
+	abs, err := filepath.Abs(out)
+	if err != nil {
+		return err
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	protected := []string{wd}
+	if home, err := os.UserHomeDir(); err == nil {
+		protected = append(protected, home)
+	}
+	for _, p := range protected {
+		rel, err := filepath.Rel(abs, p)
+		if err != nil {
+			return err
+		}
+		if filepath.IsLocal(rel) {
+			return fmt.Errorf("refusing to clear output directory %s: it contains %s", abs, p)
 		}
 	}
 	return nil
@@ -110,6 +142,9 @@ func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		note.Slug = strings.TrimSuffix(path.Base(name), path.Ext(name))
+		if !validSlug.MatchString(note.Slug) {
+			return nil, fmt.Errorf("%s: slug must match %s", name, validSlug)
+		}
 		notes = append(notes, note)
 	}
 	slices.SortFunc(notes, func(a, b Note) int {
@@ -119,6 +154,9 @@ func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
 }
 
 const wordsPerMinute = 230
+
+// validSlug matches the slugs that are safe to use unescaped in a URL.
+var validSlug = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 var markdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM, extension.Footnote),
@@ -134,8 +172,14 @@ func parseNote(src []byte) (Note, error) {
 		Title string    `yaml:"title"`
 		Date  time.Time `yaml:"date"`
 	}
-	if err := yaml.Unmarshal(front, &meta); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(front))
+	if err := dec.Decode(&meta); err != nil && !errors.Is(err, io.EOF) {
 		return Note{}, fmt.Errorf("front matter: %w", err)
+	}
+	// A second document means a closing delimiter was missed, such as one with
+	// trailing whitespace, and body text was consumed as front matter.
+	if err := dec.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return Note{}, errors.New("front matter: more than one YAML document")
 	}
 	if meta.Title == "" {
 		return Note{}, errors.New("front matter: missing title")
@@ -157,15 +201,14 @@ func parseNote(src []byte) (Note, error) {
 
 func splitFrontMatter(src []byte) (front, body []byte, err error) {
 	src = bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n"))
-	rest, ok := bytes.CutPrefix(src, []byte("---\n"))
-	if !ok {
+	if !bytes.HasPrefix(src, []byte("---\n")) {
 		return nil, nil, errors.New("missing front matter")
 	}
-	// Keep the newline before the closing delimiter so that an empty block
-	// is still found, and so the YAML keeps its final line ending.
-	end := bytes.Index(append([]byte("\n"), rest...), []byte("\n---\n"))
-	if end < 0 {
+	// Cut after the opening dashes, so that an empty block still has the
+	// newline that the closing delimiter is matched with.
+	front, body, ok := bytes.Cut(src[len("---"):], []byte("\n---\n"))
+	if !ok {
 		return nil, nil, errors.New("unterminated front matter")
 	}
-	return rest[:end], rest[end+len("---\n"):], nil
+	return front, body, nil
 }
