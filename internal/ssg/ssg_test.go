@@ -95,3 +95,56 @@ func TestBuild(t *testing.T) {
 		t.Errorf("stale output not removed: %v", err)
 	}
 }
+
+func TestBuildBundlesCSS(t *testing.T) {
+	out := t.TempDir()
+	assets := fstest.MapFS{
+		"assets/site.css": {Data: []byte("@layer a, b;\n@import \"./base.css\";\n")},
+		"assets/base.css": {Data: []byte(`
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+@font-face {
+  font-family: "F";
+  src: url("fonts/f.woff2") format("woff2");
+}
+@layer b {
+  p {
+    color: red;
+    & a {
+      color: blue;
+    }
+  }
+}
+`)},
+		"assets/fonts/f.woff2": {Data: []byte("font")},
+	}
+	if err := Build(context.Background(), out, nil, assets); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(out, "assets", "site.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(got)
+	if !strings.HasPrefix(css, "@layer a,b;") {
+		t.Errorf("layer order not first: %q", css)
+	}
+	for _, want := range []string{"@view-transition{navigation:auto}", "url(fonts/f.woff2)", "& a{"} {
+		if !strings.Contains(css, want) {
+			t.Errorf("got %q, want %q", css, want)
+		}
+	}
+	if strings.Contains(css, "@import") {
+		t.Errorf("import not bundled: %q", css)
+	}
+	if _, err := os.Stat(filepath.Join(out, "assets", "base.css")); !os.IsNotExist(err) {
+		t.Errorf("imported stylesheet not removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "assets", "fonts", "f.woff2")); err != nil {
+		t.Errorf("font not copied: %v", err)
+	}
+}
