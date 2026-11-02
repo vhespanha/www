@@ -7,15 +7,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/a-h/templ"
+	"github.com/evanw/esbuild/pkg/api"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
@@ -30,13 +33,23 @@ type Page struct {
 	Content templ.Component
 }
 
-// Build replaces the contents of the directory out with the files of assets
-// and the rendered pages.
+// stylesheet is the slash-separated path, within the assets, of the stylesheet
+// that imports all the others.
+const stylesheet = "assets/site.css"
+
+// Build replaces the contents of the directory out with the files of assets,
+// with their stylesheets bundled into one, and the rendered pages.
 func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
+	if err := checkOut(out); err != nil {
+		return err
+	}
 	if err := clearDir(out); err != nil {
 		return err
 	}
 	if err := os.CopyFS(out, assets); err != nil {
+		return err
+	}
+	if err := bundleCSS(filepath.Join(out, filepath.FromSlash(stylesheet))); err != nil {
 		return err
 	}
 	for _, p := range pages {
@@ -49,6 +62,67 @@ func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 			return err
 		}
 		if err := os.WriteFile(name, buf.Bytes(), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkOut refuses an output directory that contains the working directory or
+// the home directory, since Build deletes everything in it.
+func checkOut(out string) error {
+	abs, err := filepath.Abs(out)
+	if err != nil {
+		return err
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	protected := []string{wd}
+	if home, err := os.UserHomeDir(); err == nil {
+		protected = append(protected, home)
+	}
+	for _, p := range protected {
+		rel, err := filepath.Rel(abs, p)
+		if err != nil {
+			return err
+		}
+		if filepath.IsLocal(rel) {
+			return fmt.Errorf("refusing to clear output directory %s: it contains %s", abs, p)
+		}
+	}
+	return nil
+}
+
+// bundleCSS replaces the stylesheet at entry with a minified bundle of itself
+// and everything it imports, then removes the other stylesheets beside it,
+// which the bundle has made redundant. Fonts stay separate files.
+func bundleCSS(entry string) error {
+	res := api.Build(api.BuildOptions{
+		EntryPoints:      []string{entry},
+		Outfile:          entry,
+		Bundle:           true,
+		MinifyWhitespace: true,
+		MinifySyntax:     true,
+		External:         []string{"*.woff2"},
+		AllowOverwrite:   true,
+		Write:            true,
+		LogLevel:         api.LogLevelSilent,
+	})
+	if len(res.Errors) > 0 {
+		msgs := api.FormatMessages(res.Errors, api.FormatMessagesOptions{})
+		return fmt.Errorf("bundle css: %s", strings.Join(msgs, ""))
+	}
+	others, err := filepath.Glob(filepath.Join(filepath.Dir(entry), "*.css"))
+	if err != nil {
+		return err
+	}
+	for _, name := range others {
+		if name == entry {
+			continue
+		}
+		if err := os.Remove(name); err != nil {
 			return err
 		}
 	}
@@ -83,23 +157,40 @@ type Note struct {
 	Minutes int
 	// Body is the note's markdown rendered to HTML.
 	Body templ.Component
+	// Translations holds the note's translations by language. It is nil on a
+	// translation.
+	Translations map[string]Note
 }
 
 // LoadNotes parses the markdown files in fsys matching the glob pattern and
-// returns them newest first.
+// returns the originals newest first, each with its translations attached.
 //
-// Each file must start with a YAML front matter block setting title and date:
+// Each original must start with a YAML front matter block setting title and
+// date:
 //
 //	---
 //	title: Hello
 //	date: 2026-11-01
 //	---
-func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
+//
+// A file named hello.pt.md is the translation of hello.md into the language
+// pt, which must be one of langs. It must set its own title and takes its date
+// from the original; it may repeat that date but not change it. A translation
+// without an original or in an unknown language is an error, so that a typo in
+// a file name cannot silently drop content.
+func LoadNotes(fsys fs.FS, pattern string, langs ...string) ([]Note, error) {
 	names, err := fs.Glob(fsys, pattern)
 	if err != nil {
 		return nil, err
 	}
-	notes := make([]Note, 0, len(names))
+	type translation struct {
+		name, lang string
+		note       Note
+	}
+	var (
+		notes        = make([]Note, 0, len(names))
+		translations []translation
+	)
 	for _, name := range names {
 		src, err := fs.ReadFile(fsys, name)
 		if err != nil {
@@ -109,8 +200,36 @@ func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		note.Slug = strings.TrimSuffix(path.Base(name), path.Ext(name))
+		slug, lang, translated := strings.Cut(strings.TrimSuffix(path.Base(name), path.Ext(name)), ".")
+		if !validSlug.MatchString(slug) {
+			return nil, fmt.Errorf("%s: slug must match %s", name, validSlug)
+		}
+		note.Slug = slug
+		if translated {
+			if !slices.Contains(langs, lang) {
+				return nil, fmt.Errorf("%s: unknown language %q", name, lang)
+			}
+			translations = append(translations, translation{name, lang, note})
+			continue
+		}
+		if note.Date.IsZero() {
+			return nil, fmt.Errorf("%s: front matter: missing date", name)
+		}
 		notes = append(notes, note)
+	}
+	for _, t := range translations {
+		i := slices.IndexFunc(notes, func(n Note) bool { return n.Slug == t.note.Slug })
+		if i < 0 {
+			return nil, fmt.Errorf("%s: no original %s.md", t.name, t.note.Slug)
+		}
+		if !t.note.Date.IsZero() && !t.note.Date.Equal(notes[i].Date) {
+			return nil, fmt.Errorf("%s: date differs from the original", t.name)
+		}
+		t.note.Date = notes[i].Date
+		if notes[i].Translations == nil {
+			notes[i].Translations = make(map[string]Note)
+		}
+		notes[i].Translations[t.lang] = t.note
 	}
 	slices.SortFunc(notes, func(a, b Note) int {
 		return cmp.Or(b.Date.Compare(a.Date), cmp.Compare(a.Slug, b.Slug))
@@ -119,6 +238,9 @@ func LoadNotes(fsys fs.FS, pattern string) ([]Note, error) {
 }
 
 const wordsPerMinute = 230
+
+// validSlug matches the slugs that are safe to use unescaped in a URL.
+var validSlug = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 var markdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM, extension.Footnote),
@@ -134,14 +256,17 @@ func parseNote(src []byte) (Note, error) {
 		Title string    `yaml:"title"`
 		Date  time.Time `yaml:"date"`
 	}
-	if err := yaml.Unmarshal(front, &meta); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(front))
+	if err := dec.Decode(&meta); err != nil && !errors.Is(err, io.EOF) {
 		return Note{}, fmt.Errorf("front matter: %w", err)
+	}
+	// A second document means a closing delimiter was missed, such as one with
+	// trailing whitespace, and body text was consumed as front matter.
+	if err := dec.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return Note{}, errors.New("front matter: more than one YAML document")
 	}
 	if meta.Title == "" {
 		return Note{}, errors.New("front matter: missing title")
-	}
-	if meta.Date.IsZero() {
-		return Note{}, errors.New("front matter: missing date")
 	}
 	var rendered bytes.Buffer
 	if err := markdown.Convert(body, &rendered); err != nil {
@@ -157,15 +282,14 @@ func parseNote(src []byte) (Note, error) {
 
 func splitFrontMatter(src []byte) (front, body []byte, err error) {
 	src = bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n"))
-	rest, ok := bytes.CutPrefix(src, []byte("---\n"))
-	if !ok {
+	if !bytes.HasPrefix(src, []byte("---\n")) {
 		return nil, nil, errors.New("missing front matter")
 	}
-	// Keep the newline before the closing delimiter so that an empty block
-	// is still found, and so the YAML keeps its final line ending.
-	end := bytes.Index(append([]byte("\n"), rest...), []byte("\n---\n"))
-	if end < 0 {
+	// Cut after the opening dashes, so that an empty block still has the
+	// newline that the closing delimiter is matched with.
+	front, body, ok := bytes.Cut(src[len("---"):], []byte("\n---\n"))
+	if !ok {
 		return nil, nil, errors.New("unterminated front matter")
 	}
-	return rest[:end], rest[end+len("---\n"):], nil
+	return front, body, nil
 }

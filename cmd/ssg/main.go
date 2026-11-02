@@ -31,16 +31,23 @@ func main() {
 
 	switch os.Args[1] {
 	case "build":
-		_ = fs.Parse(os.Args[2:])
+		parse(fs)
 		if err := build(*out); err != nil {
 			log.Fatal(err)
 		}
 	case "serve":
 		addr := fs.String("addr", "localhost:8080", "address to listen on")
-		_ = fs.Parse(os.Args[2:])
+		parse(fs)
 		log.Printf("serving %s on http://%s", *out, *addr)
 		log.Fatal(http.ListenAndServe(*addr, http.FileServer(http.Dir(*out))))
 	default:
+		usage()
+	}
+}
+
+func parse(fs *flag.FlagSet) {
+	_ = fs.Parse(os.Args[2:])
+	if fs.NArg() > 0 {
 		usage()
 	}
 }

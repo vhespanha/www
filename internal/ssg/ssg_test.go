@@ -50,6 +50,7 @@ func TestLoadNotesInvalid(t *testing.T) {
 		"no title":        "---\ndate: 2026-01-02\n---\n",
 		"no date":         "---\ntitle: A\n---\n",
 		"bad yaml":        "---\ntitle: [\n---\n",
+		"spaced closing":  "---\ntitle: A\ndate: 2026-01-02\n--- \nFirst\n\n---\n\nSecond\n",
 	}
 	for name, src := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -62,6 +63,97 @@ func TestLoadNotesInvalid(t *testing.T) {
 				t.Errorf("error %q does not name the file", err)
 			}
 		})
+	}
+}
+
+func TestLoadNotesTranslations(t *testing.T) {
+	fsys := fstest.MapFS{
+		"a.md":    {Data: []byte("---\ntitle: A\ndate: 2026-01-02\n---\nBody\n")},
+		"a.pt.md": {Data: []byte("---\ntitle: A em pt\n---\nCorpo\n")},
+		"b.md":    {Data: []byte("---\ntitle: B\ndate: 2025-01-02\n---\nBody\n")},
+		"b.pt.md": {Data: []byte("---\ntitle: B em pt\ndate: 2025-01-02\n---\nCorpo\n")},
+		"c.md":    {Data: []byte("---\ntitle: C\ndate: 2024-01-02\n---\nBody\n")},
+	}
+	notes, err := LoadNotes(fsys, "*.md", "pt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notes) != 3 {
+		t.Fatalf("got %d notes, want the 3 originals", len(notes))
+	}
+	a, ok := notes[0].Translations["pt"]
+	if !ok {
+		t.Fatal("translation of a not attached")
+	}
+	if a.Title != "A em pt" || a.Slug != "a" || !a.Date.Equal(notes[0].Date) {
+		t.Errorf("got translation %q %q %v", a.Title, a.Slug, a.Date)
+	}
+	if notes[2].Translations != nil {
+		t.Errorf("got translations %v on an untranslated note", notes[2].Translations)
+	}
+}
+
+func TestLoadNotesInvalidTranslations(t *testing.T) {
+	const original = "---\ntitle: A\ndate: 2026-01-02\n---\n"
+	tests := map[string]fstest.MapFS{
+		"no original": {
+			"a.pt.md": {Data: []byte("---\ntitle: A\n---\n")},
+		},
+		"unknown language": {
+			"a.md":    {Data: []byte(original)},
+			"a.es.md": {Data: []byte("---\ntitle: A\n---\n")},
+		},
+		"different date": {
+			"a.md":    {Data: []byte(original)},
+			"a.pt.md": {Data: []byte("---\ntitle: A\ndate: 2026-01-03\n---\n")},
+		},
+		"no title": {
+			"a.md":    {Data: []byte(original)},
+			"a.pt.md": {Data: []byte("---\ndate: 2026-01-02\n---\n")},
+		},
+	}
+	for name, fsys := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := LoadNotes(fsys, "*.md", "pt")
+			if err == nil {
+				t.Fatal("got nil error")
+			}
+			if !strings.Contains(err.Error(), ".md: ") {
+				t.Errorf("error %q does not name the file", err)
+			}
+		})
+	}
+}
+
+func TestLoadNotesInvalidSlug(t *testing.T) {
+	src := []byte("---\ntitle: A\ndate: 2026-01-02\n---\n")
+	for _, name := range []string{"c#-tips.md", "Upper.md", "a b.md", "Upper.pt.md"} {
+		_, err := LoadNotes(fstest.MapFS{name: {Data: src}}, "*.md", "pt")
+		if err == nil || !strings.HasPrefix(err.Error(), name+": ") {
+			t.Errorf("%s: got error %v", name, err)
+		}
+	}
+}
+
+func TestBuildRefusesProtectedDirs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	wd := filepath.Join(t.TempDir(), "wd")
+	if err := os.Mkdir(wd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(wd)
+	keep := filepath.Join(wd, "keep")
+	if err := os.WriteFile(keep, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, out := range []string{".", "..", home} {
+		if err := Build(context.Background(), out, nil, fstest.MapFS{}); err == nil {
+			t.Errorf("Build(%q): got nil error", out)
+		}
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Errorf("working directory was cleared: %v", err)
 	}
 }
 
@@ -93,5 +185,58 @@ func TestBuild(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Dir(stale)); !os.IsNotExist(err) {
 		t.Errorf("stale output not removed: %v", err)
+	}
+}
+
+func TestBuildBundlesCSS(t *testing.T) {
+	out := t.TempDir()
+	assets := fstest.MapFS{
+		"assets/site.css": {Data: []byte("@layer a, b;\n@import \"./base.css\";\n")},
+		"assets/base.css": {Data: []byte(`
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+@font-face {
+  font-family: "F";
+  src: url("fonts/f.woff2") format("woff2");
+}
+@layer b {
+  p {
+    color: red;
+    & a {
+      color: blue;
+    }
+  }
+}
+`)},
+		"assets/fonts/f.woff2": {Data: []byte("font")},
+	}
+	if err := Build(context.Background(), out, nil, assets); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(out, "assets", "site.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(got)
+	if !strings.HasPrefix(css, "@layer a,b;") {
+		t.Errorf("layer order not first: %q", css)
+	}
+	for _, want := range []string{"@view-transition{navigation:auto}", "url(fonts/f.woff2)", "& a{"} {
+		if !strings.Contains(css, want) {
+			t.Errorf("got %q, want %q", css, want)
+		}
+	}
+	if strings.Contains(css, "@import") {
+		t.Errorf("import not bundled: %q", css)
+	}
+	if _, err := os.Stat(filepath.Join(out, "assets", "base.css")); !os.IsNotExist(err) {
+		t.Errorf("imported stylesheet not removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "assets", "fonts", "f.woff2")); err != nil {
+		t.Errorf("font not copied: %v", err)
 	}
 }

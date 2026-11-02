@@ -1,0 +1,64 @@
+package site
+
+import (
+	"fmt"
+	"time"
+)
+
+type portuguese struct{}
+
+func (portuguese) key() string   { return "pt" }
+func (portuguese) tag() string   { return "pt-BR" }
+func (portuguese) name() string  { return "Português" }
+func (portuguese) other() locale { return english{} }
+
+func (portuguese) homeTitle() string   { return "vhespanha" }
+func (portuguese) role() string        { return "Engenheiro de Software · São Paulo, Brasil" }
+func (portuguese) openToRoles() string { return "Em busca de novas oportunidades. Entre em contato." }
+func (portuguese) email() string       { return "E-mail" }
+
+func (portuguese) notesTitle() string  { return "Notas" }
+func (portuguese) notesKicker() string { return "notas" }
+func (portuguese) allNotes() string    { return "Todas as notas" }
+
+func (portuguese) readingTime(minutes int) string { return fmt.Sprintf("%d min de leitura", minutes) }
+
+var portugueseMonths = [...]string{
+	"janeiro", "fevereiro", "março", "abril", "maio", "junho",
+	"julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+}
+
+func (portuguese) longDate(t time.Time) string {
+	day := fmt.Sprint(t.Day())
+	if t.Day() == 1 {
+		day = "1º"
+	}
+	return fmt.Sprintf("%s de %s de %d", day, portugueseMonths[t.Month()-1], t.Year())
+}
+
+func (portuguese) inEnglish() string { return "em inglês" }
+
+func (portuguese) notFoundTitle() string { return "Página não encontrada" }
+
+func (portuguese) languageLabel() string { return "Idioma" }
+func (portuguese) offerText() string     { return "Esta página também está disponível em português." }
+func (portuguese) offerAccept() string   { return "Ler em português" }
+func (portuguese) offerDismiss() string  { return "Agora não" }
+
+templ (portuguese) intro() {
+	<p>
+		Construo coisas, geralmente pequenas e geralmente do zero,
+		principalmente para entender como funcionam.
+	</p>
+	<p>
+		Ultimamente tenho transformado caos operacional em sistemas
+		que as pessoas podem confiar. Prefiro construir uma ferramenta
+		pequena e compreensível do que uma grande e complicada.
+	</p>
+}
+
+templ (portuguese) notFoundBody() {
+	<p>
+		Não há nada neste endereço. <a href="/pt/">Voltar</a>.
+	</p>
+}

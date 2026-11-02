@@ -1,84 +1,93 @@
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition {
-    navigation: auto;
-  }
-}
+html {
+  /* scales every family to crimson pro's x-height; the type scale assumes it */
+  font-size-adjust: ex-height 0.42;
+  font-kerning: normal;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 21px;
+  line-height: 32px;
+  font-weight: var(--weight-regular);
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  font-variant-ligatures: common-ligatures;
 
-@layer base {
-  :root {
-    /* scales every family to crimson pro's x-height; the type scale assumes it */
-    font-size-adjust: ex-height 0.42;
-    font-kerning: normal;
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
-    text-size-adjust: 100%;
-    -webkit-text-size-adjust: 100%;
-  }
-
-  html {
-    background: var(--surface);
-    color: var(--ink);
-    font-family: var(--font-serif);
-    font-size: 21px;
-    line-height: 32px;
-    font-weight: var(--weight-regular);
-
-    @media (width <= 480px) {
-      font-size: 19px;
-      line-height: 29px;
-    }
-  }
-
-  body {
-    margin: 0;
+  @media (width <= 480px) {
+    font-size: 19px;
+    line-height: 29px;
   }
 
   @media (prefers-color-scheme: dark) {
-    :root {
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
 
-  ::selection {
-    background: var(--ink);
-    color: var(--surface);
+body {
+  margin: 0;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--ink-muted);
+  text-underline-offset: 0.22em;
+
+  &:hover {
+    text-decoration-color: currentColor;
   }
+}
 
-  :focus-visible {
-    outline: 2px solid var(--ink);
-    outline-offset: 3px;
+:is(h1, h2, h3) {
+  font-weight: var(--weight-regular);
+  text-wrap: balance;
+  hyphens: manual;
+}
+
+h1 {
+  font-size: 48px;
+  line-height: 56px;
+  letter-spacing: -0.015em;
+  font-variant-numeric: lining-nums;
+
+  @media (width <= 480px) {
+    font-size: 38px;
+    line-height: 44px;
   }
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    ::view-transition-group(*),
-    ::view-transition-old(*),
-    ::view-transition-new(*) {
-      animation: none;
-    }
-  }
+h2 {
+  font-size: 30px;
+  line-height: 40px;
+  letter-spacing: -0.005em;
+}
 
-  a {
-    color: inherit;
-    text-decoration-line: underline;
-    text-decoration-thickness: 1px;
-    text-decoration-color: var(--ink-muted);
-    text-underline-offset: 0.22em;
-    text-decoration-skip-ink: auto;
+h3 {
+  font-size: 1rem;
+  line-height: 1rlh;
+  font-weight: var(--weight-bold);
+}
 
-    &:hover {
-      text-decoration-color: currentColor;
-    }
-  }
-
-  .meta {
-    font-family: var(--font-sans);
-    font-size: 16px;
-    line-height: 24px;
-    font-weight: 400;
-    letter-spacing: 0.01em;
-    color: var(--ink-muted);
-    font-variant-numeric: lining-nums tabular-nums;
-    hyphens: manual;
-  }
+.meta {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--ink-muted);
+  font-variant-numeric: lining-nums tabular-nums;
+  hyphens: manual;
 }

@@ -1,6 +1,12 @@
-@layer tokens, base, components;
 @import "./fonts.css";
-@import "./tokens.css";
-@import "./base.css";
-@import "./prose.css";
-@import "./home.css";
+@import "./tokens.css" layer(tokens);
+@import "./base.css" layer(base);
+@import "./prose.css" layer(components);
+@import "./home.css" layer(components);
+@import "./lang.css" layer(components);
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
