@@ -1,61 +1,59 @@
-@layer components {
-  /* The footer lines up with the content of whichever page it closes. */
-  .site-footer {
-    padding-inline: var(--gutter);
-    padding-block-end: var(--space-3);
-  }
-  .prose + .site-footer {
-    max-width: var(--measure);
-    margin-inline: auto;
-    margin-block-start: calc(var(--space-4) * -1);
-  }
-  .home + .site-footer {
-    max-width: 1440px;
-    margin-inline: auto;
+/* The footer lines up with the content of whichever page it closes. */
+.site-footer {
+  padding-inline: var(--gutter);
+  padding-block-end: var(--space-3);
+}
+.prose + .site-footer {
+  max-width: var(--measure);
+  margin-inline: auto;
+  margin-block-start: calc(var(--space-4) * -1);
+}
+.home + .site-footer {
+  max-width: 1440px;
+  margin-inline: auto;
 
-    /* The same box as .home, so that both centre alike on wide screens. */
-    @media (width >= 1000px) {
-      padding-inline: var(--space-4) 0;
+  /* The same box as .home, so that both centre alike on wide screens. */
+  @media (width >= 1000px) {
+    padding-inline: var(--space-4) 0;
+  }
+}
+
+.lang-offer {
+  position: fixed;
+  inset-block-end: var(--space-2);
+  inset-inline-end: var(--space-2);
+  max-width: min(22em, 100vw - 2 * var(--space-2));
+  box-sizing: border-box;
+  padding: var(--space-2);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--ink-muted);
+
+  p {
+    margin: 0;
+  }
+
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-muted);
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.22em;
+
+    &:hover {
+      color: var(--ink);
     }
   }
+}
 
-  .lang-offer {
-    position: fixed;
-    inset-block-end: var(--space-2);
-    inset-inline-end: var(--space-2);
-    max-width: min(22em, 100vw - 2 * var(--space-2));
-    box-sizing: border-box;
-    padding: var(--space-2);
-    background: var(--surface);
-    color: var(--ink);
-    border: 1px solid var(--ink-muted);
-
-    p {
-      margin: 0;
-    }
-
-    button {
-      padding: 0;
-      border: 0;
-      background: none;
-      color: var(--ink-muted);
-      font: inherit;
-      letter-spacing: inherit;
-      cursor: pointer;
-      text-decoration-line: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 0.22em;
-
-      &:hover {
-        color: var(--ink);
-      }
-    }
-  }
-
-  .lang-offer .lang-offer-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin-block-start: var(--space-1);
-  }
+.lang-offer .lang-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-1);
 }
