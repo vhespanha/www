@@ -3,6 +3,7 @@
 @import "./base.css" layer(base);
 @import "./prose.css" layer(components);
 @import "./home.css" layer(components);
+@import "./lang.css" layer(components);
 
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {

@@ -1,34 +1,40 @@
 package site
 
-import (
-	"fmt"
-	"go.vhespanha.dev/www/internal/ssg"
-)
+import "go.vhespanha.dev/www/internal/ssg"
 
-templ Notes(notes []ssg.Note) {
-	@layout("Notes") {
-		<h1>Notes</h1>
-		@noteList(notes)
+templ Notes(p page, notes []noteItem) {
+	@layout(p, p.l.notesTitle()) {
+		<h1>{ p.l.notesTitle() }</h1>
+		@noteList(p.l, notes)
 	}
 }
 
-templ Note(p ssg.Note) {
-	@layout(p.Title) {
-		<p class="kicker">notes</p>
-		<h1>{ p.Title }</h1>
+templ Note(p page, n ssg.Note) {
+	@layout(p, n.Title) {
+		<p class="kicker">{ p.l.notesKicker() }</p>
+		<h1>{ n.Title }</h1>
 		<p class="meta">
-			<time datetime={ isoDate(p.Date) }>{ longDate(p.Date) }</time> &middot; { fmt.Sprintf("%d min read", p.Minutes) }
+			<time datetime={ isoDate(n.Date) }>{ p.l.longDate(n.Date) }</time> &middot; { p.l.readingTime(n.Minutes) }
 		</p>
-		@p.Body
+		@n.Body
 	}
 }
 
-templ noteList(notes []ssg.Note) {
+templ noteList(l locale, notes []noteItem) {
 	<ul class="note-list">
-		for _, p := range notes {
+		for _, n := range notes {
 			<li>
-				<a href={ templ.URL("/notes/" + p.Slug + "/") }>{ p.Title }</a>
-				<time class="meta" datetime={ isoDate(p.Date) }>{ longDate(p.Date) }</time>
+				if n.original != nil {
+					<a href={ templ.URL(n.href) } hreflang={ n.original.tag() } lang={ n.original.tag() }>{ n.title }</a>
+				} else {
+					<a href={ templ.URL(n.href) }>{ n.title }</a>
+				}
+				<span class="meta">
+					<time datetime={ isoDate(n.date) }>{ l.longDate(n.date) }</time>
+					if n.original != nil {
+						&middot; { l.inEnglish() }
+					}
+				</span>
 			</li>
 		}
 	</ul>

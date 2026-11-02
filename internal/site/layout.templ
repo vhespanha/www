@@ -1,8 +1,8 @@
 package site
 
-templ document(title string) {
+templ document(p page, title string) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang={ p.l.tag() }>
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -13,17 +13,82 @@ templ document(title string) {
 			<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
 			<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"/>
 			<link rel="stylesheet" href="/assets/site.css"/>
+			if p.path != "" {
+				<link rel="canonical" href={ origin + localeURL(p.l, p.path) }/>
+			}
+			if p.translated {
+				<link rel="alternate" hreflang={ p.l.tag() } href={ origin + localeURL(p.l, p.path) }/>
+				<link rel="alternate" hreflang={ p.l.other().tag() } href={ origin + localeURL(p.l.other(), p.path) } data-other/>
+				<link rel="alternate" hreflang="x-default" href={ origin + p.path }/>
+				@languageRedirect()
+				<script src="/assets/lang.js" defer></script>
+			}
 		</head>
 		<body>
 			{ children... }
+			if p.translated {
+				@languageSwitch(p)
+				@languageOffer(p)
+			}
 		</body>
 	</html>
 }
 
-templ layout(title string) {
-	@document(title) {
+templ layout(p page, title string) {
+	@document(p, title) {
 		<article class="prose">
 			{ children... }
 		</article>
 	}
+}
+
+// languageRedirect sends a reader who explicitly chose the other language to
+// this page in that language. It only acts when arriving from elsewhere, so it
+// never overrides a link followed within the site or traps the back button. It
+// is inline so that it runs before the first paint. The rest of the behaviour
+// lives in lang.js.
+templ languageRedirect() {
+	<script>
+		(function () {
+			try {
+				var other = document.querySelector("link[data-other]");
+				if (localStorage.getItem("lang") !== other.hreflang) return;
+				var nav = performance.getEntriesByType("navigation")[0];
+				if (nav && nav.type !== "navigate") return;
+				if (document.referrer && new URL(document.referrer).origin === location.origin) return;
+				location.replace(new URL(other.href).pathname + location.search + location.hash);
+			} catch (e) {}
+		})();
+	</script>
+}
+
+// languageSwitch is a plain link, so it works without JavaScript. lang.js saves
+// the choice when it is followed.
+templ languageSwitch(p page) {
+	<footer class="site-footer">
+		<nav class="meta" aria-label={ p.l.languageLabel() }>
+			<a
+				href={ templ.URL(localeURL(p.l.other(), p.path)) }
+				hreflang={ p.l.other().tag() }
+				lang={ p.l.other().tag() }
+				data-lang-choice
+			>{ p.l.other().name() }</a>
+		</nav>
+	</footer>
+}
+
+// languageOffer is the prompt lang.js shows to readers whose browser prefers the
+// other language. It is written in that language, since that is the one they
+// are known to read.
+templ languageOffer(p page) {
+	{{ other := p.l.other() }}
+	<template id="lang-offer">
+		<aside class="lang-offer meta" lang={ other.tag() } aria-label={ other.languageLabel() }>
+			<p>{ other.offerText() }</p>
+			<p class="lang-offer-actions">
+				<a href={ templ.URL(localeURL(other, p.path)) } hreflang={ other.tag() } data-lang-choice>{ other.offerAccept() }</a>
+				<button type="button">{ other.offerDismiss() }</button>
+			</p>
+		</aside>
+	</template>
 }

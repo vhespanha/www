@@ -66,10 +66,69 @@ func TestLoadNotesInvalid(t *testing.T) {
 	}
 }
 
+func TestLoadNotesTranslations(t *testing.T) {
+	fsys := fstest.MapFS{
+		"a.md":    {Data: []byte("---\ntitle: A\ndate: 2026-01-02\n---\nBody\n")},
+		"a.pt.md": {Data: []byte("---\ntitle: A em pt\n---\nCorpo\n")},
+		"b.md":    {Data: []byte("---\ntitle: B\ndate: 2025-01-02\n---\nBody\n")},
+		"b.pt.md": {Data: []byte("---\ntitle: B em pt\ndate: 2025-01-02\n---\nCorpo\n")},
+		"c.md":    {Data: []byte("---\ntitle: C\ndate: 2024-01-02\n---\nBody\n")},
+	}
+	notes, err := LoadNotes(fsys, "*.md", "pt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notes) != 3 {
+		t.Fatalf("got %d notes, want the 3 originals", len(notes))
+	}
+	a, ok := notes[0].Translations["pt"]
+	if !ok {
+		t.Fatal("translation of a not attached")
+	}
+	if a.Title != "A em pt" || a.Slug != "a" || !a.Date.Equal(notes[0].Date) {
+		t.Errorf("got translation %q %q %v", a.Title, a.Slug, a.Date)
+	}
+	if notes[2].Translations != nil {
+		t.Errorf("got translations %v on an untranslated note", notes[2].Translations)
+	}
+}
+
+func TestLoadNotesInvalidTranslations(t *testing.T) {
+	const original = "---\ntitle: A\ndate: 2026-01-02\n---\n"
+	tests := map[string]fstest.MapFS{
+		"no original": {
+			"a.pt.md": {Data: []byte("---\ntitle: A\n---\n")},
+		},
+		"unknown language": {
+			"a.md":    {Data: []byte(original)},
+			"a.es.md": {Data: []byte("---\ntitle: A\n---\n")},
+		},
+		"different date": {
+			"a.md":    {Data: []byte(original)},
+			"a.pt.md": {Data: []byte("---\ntitle: A\ndate: 2026-01-03\n---\n")},
+		},
+		"no title": {
+			"a.md":    {Data: []byte(original)},
+			"a.pt.md": {Data: []byte("---\ndate: 2026-01-02\n---\n")},
+		},
+	}
+	for name, fsys := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := LoadNotes(fsys, "*.md", "pt")
+			if err == nil {
+				t.Fatal("got nil error")
+			}
+			if !strings.Contains(err.Error(), ".md: ") {
+				t.Errorf("error %q does not name the file", err)
+			}
+		})
+	}
+}
+
 func TestLoadNotesInvalidSlug(t *testing.T) {
 	src := []byte("---\ntitle: A\ndate: 2026-01-02\n---\n")
-	for _, name := range []string{"c#-tips.md", "Upper.md", "a b.md"} {
-		_, err := LoadNotes(fstest.MapFS{name: {Data: src}}, "*.md")
+	for _, name := range []string{"c#-tips.md", "Upper.md", "a b.md", "Upper.pt.md"} {
+		_, err := LoadNotes(fstest.MapFS{name: {Data: src}}, "*.md", "pt")
 		if err == nil || !strings.HasPrefix(err.Error(), name+": ") {
 			t.Errorf("%s: got error %v", name, err)
 		}
