@@ -68,7 +68,6 @@ func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 	return nil
 }
 
-<<<<<<< HEAD
 // checkOut refuses an output directory that contains the working directory or
 // the home directory, since Build deletes everything in it.
 func checkOut(out string) error {
@@ -91,7 +90,11 @@ func checkOut(out string) error {
 		}
 		if filepath.IsLocal(rel) {
 			return fmt.Errorf("refusing to clear output directory %s: it contains %s", abs, p)
-=======
+		}
+	}
+	return nil
+}
+
 // bundleCSS replaces the stylesheet at entry with a minified bundle of itself
 // and everything it imports, then removes the other stylesheets beside it,
 // which the bundle has made redundant. Fonts stay separate files.
@@ -121,7 +124,6 @@ func bundleCSS(entry string) error {
 		}
 		if err := os.Remove(name); err != nil {
 			return err
->>>>>>> origin/main
 		}
 	}
 	return nil
