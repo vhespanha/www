@@ -38,3 +38,6 @@ go.work.sum
 
 # Build output
 /dist/
+
+# Wrangler local state
+.wrangler/

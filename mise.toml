@@ -49,6 +49,11 @@ run = [
   "go tool errcheck ./...",
 ]
 
+[tasks.test]
+description = "Run the Go tests"
+depends = ["generate"]
+run = "go test ./..."
+
 [tasks.clean]
 description = "Remove build output and generated templ code"
 run = "rm -rf dist && find . -name '*_templ.go' -delete"
