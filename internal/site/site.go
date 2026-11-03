@@ -29,7 +29,7 @@ func Pages() ([]ssg.Page, error) {
 }
 
 func pages(fsys fs.FS, pattern string) ([]ssg.Page, error) {
-	notes, err := ssg.LoadNotes(fsys, pattern, portuguese{}.key())
+	notes, err := ssg.LoadNotes(fsys, pattern, components, portuguese{}.key())
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func pages(fsys fs.FS, pattern string) ([]ssg.Page, error) {
 				continue
 			}
 			_, translated := noteIn(n, l.other())
-			add(page{l: l, path: path, translated: translated}, func(p page) templ.Component {
+			add(page{l: l, path: path, translated: translated, head: text.Head}, func(p page) templ.Component {
 				return Note(p, text)
 			})
 		}
@@ -109,6 +109,9 @@ type page struct {
 	path string
 	// translated reports whether the page also exists in the other language.
 	translated bool
+	// head is added to the page's head, such as the scripts of the
+	// components a note uses.
+	head []templ.Component
 }
 
 // file returns the page's output file.

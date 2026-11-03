@@ -21,7 +21,10 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -157,6 +160,9 @@ type Note struct {
 	Minutes int
 	// Body is the note's markdown rendered to HTML.
 	Body templ.Component
+	// Head holds the head content of the components the note uses, once
+	// each, in order of first use.
+	Head []templ.Component
 	// Translations holds the note's translations by language. It is nil on a
 	// translation.
 	Translations map[string]Note
@@ -164,6 +170,7 @@ type Note struct {
 
 // LoadNotes parses the markdown files in fsys matching the glob pattern and
 // returns the originals newest first, each with its translations attached.
+// Notes embed components by name, as described in [Component].
 //
 // Each original must start with a YAML front matter block setting title and
 // date:
@@ -178,7 +185,7 @@ type Note struct {
 // from the original; it may repeat that date but not change it. A translation
 // without an original or in an unknown language is an error, so that a typo in
 // a file name cannot silently drop content.
-func LoadNotes(fsys fs.FS, pattern string, langs ...string) ([]Note, error) {
+func LoadNotes(fsys fs.FS, pattern string, components map[string]Component, langs ...string) ([]Note, error) {
 	names, err := fs.Glob(fsys, pattern)
 	if err != nil {
 		return nil, err
@@ -187,6 +194,7 @@ func LoadNotes(fsys fs.FS, pattern string, langs ...string) ([]Note, error) {
 		name, lang string
 		note       Note
 	}
+	md := newMarkdown(components)
 	var (
 		notes        = make([]Note, 0, len(names))
 		translations []translation
@@ -196,7 +204,7 @@ func LoadNotes(fsys fs.FS, pattern string, langs ...string) ([]Note, error) {
 		if err != nil {
 			return nil, err
 		}
-		note, err := parseNote(src)
+		note, err := parseNote(md, src)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
@@ -242,12 +250,20 @@ const wordsPerMinute = 230
 // validSlug matches the slugs that are safe to use unescaped in a URL.
 var validSlug = regexp.MustCompile(`^[a-z0-9-]+$`)
 
-var markdown = goldmark.New(
-	goldmark.WithExtensions(extension.GFM, extension.Footnote),
-	goldmark.WithRendererOptions(html.WithUnsafe()),
-)
+func newMarkdown(components map[string]Component) goldmark.Markdown {
+	return goldmark.New(
+		goldmark.WithExtensions(extension.GFM, extension.Footnote),
+		goldmark.WithParserOptions(parser.WithASTTransformers(
+			util.Prioritized(componentTransformer(components), 100),
+		)),
+		goldmark.WithRendererOptions(
+			html.WithUnsafe(),
+			renderer.WithNodeRenderers(util.Prioritized(componentRenderer{}, 100)),
+		),
+	)
+}
 
-func parseNote(src []byte) (Note, error) {
+func parseNote(md goldmark.Markdown, src []byte) (Note, error) {
 	front, body, err := splitFrontMatter(src)
 	if err != nil {
 		return Note{}, err
@@ -269,14 +285,21 @@ func parseNote(src []byte) (Note, error) {
 		return Note{}, errors.New("front matter: missing title")
 	}
 	var rendered bytes.Buffer
-	if err := markdown.Convert(body, &rendered); err != nil {
+	uses := new(componentUses)
+	pc := parser.NewContext()
+	pc.Set(usesKey, uses)
+	if err := md.Convert(body, &rendered, parser.WithContext(pc)); err != nil {
 		return Note{}, fmt.Errorf("markdown: %w", err)
+	}
+	if uses.err != nil {
+		return Note{}, uses.err
 	}
 	return Note{
 		Title:   meta.Title,
 		Date:    meta.Date,
 		Minutes: max(1, (len(bytes.Fields(body))+wordsPerMinute-1)/wordsPerMinute),
 		Body:    templ.Raw(rendered.String()),
+		Head:    uses.heads,
 	}, nil
 }
 

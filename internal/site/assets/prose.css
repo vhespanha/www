@@ -132,6 +132,13 @@
   figure {
     margin: var(--space-4) 0;
   }
+  .demo {
+    padding: var(--space-2);
+    border: 1px solid color-mix(in oklab, var(--ink) 15%, var(--surface));
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 24px;
+  }
   figcaption {
     margin-top: var(--space-1);
   }
