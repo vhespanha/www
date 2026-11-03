@@ -3,6 +3,7 @@ package ssg
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,7 @@ func TestLoadNotes(t *testing.T) {
 		"notes/new.md":      {Data: []byte("---\r\ntitle: New\r\ndate: 2026-01-02\r\n---\r\nBody\r\n")},
 		"notes/ignored.txt": {Data: []byte("not a note")},
 	}
-	notes, err := LoadNotes(fsys, "notes/*.md")
+	notes, err := LoadNotes(fsys, "notes/*.md", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestLoadNotesInvalid(t *testing.T) {
 	for name, src := range tests {
 		t.Run(name, func(t *testing.T) {
 			fsys := fstest.MapFS{"bad.md": {Data: []byte(src)}}
-			_, err := LoadNotes(fsys, "*.md")
+			_, err := LoadNotes(fsys, "*.md", nil)
 			if err == nil {
 				t.Fatal("got nil error")
 			}
@@ -74,7 +75,7 @@ func TestLoadNotesTranslations(t *testing.T) {
 		"b.pt.md": {Data: []byte("---\ntitle: B em pt\ndate: 2025-01-02\n---\nCorpo\n")},
 		"c.md":    {Data: []byte("---\ntitle: C\ndate: 2024-01-02\n---\nBody\n")},
 	}
-	notes, err := LoadNotes(fsys, "*.md", "pt")
+	notes, err := LoadNotes(fsys, "*.md", nil, "pt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func TestLoadNotesInvalidTranslations(t *testing.T) {
 	}
 	for name, fsys := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := LoadNotes(fsys, "*.md", "pt")
+			_, err := LoadNotes(fsys, "*.md", nil, "pt")
 			if err == nil {
 				t.Fatal("got nil error")
 			}
@@ -128,7 +129,7 @@ func TestLoadNotesInvalidTranslations(t *testing.T) {
 func TestLoadNotesInvalidSlug(t *testing.T) {
 	src := []byte("---\ntitle: A\ndate: 2026-01-02\n---\n")
 	for _, name := range []string{"c#-tips.md", "Upper.md", "a b.md", "Upper.pt.md"} {
-		_, err := LoadNotes(fstest.MapFS{name: {Data: src}}, "*.md", "pt")
+		_, err := LoadNotes(fstest.MapFS{name: {Data: src}}, "*.md", nil, "pt")
 		if err == nil || !strings.HasPrefix(err.Error(), name+": ") {
 			t.Errorf("%s: got error %v", name, err)
 		}
@@ -238,5 +239,51 @@ func TestBuildBundlesCSS(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "assets", "fonts", "f.woff2")); err != nil {
 		t.Errorf("font not copied: %v", err)
+	}
+}
+
+func TestLoadNotesComponents(t *testing.T) {
+	type props struct {
+		N int `yaml:"n"`
+	}
+	components := map[string]Component{
+		"num": NewComponent(func(p props) templ.Component {
+			return templ.Raw(fmt.Sprintf("<b>%d</b>", p.N))
+		}, templ.Raw("<script></script>")),
+		"bare": NewComponent(func(struct{}) templ.Component {
+			return templ.Raw("<i>bare</i>")
+		}, nil),
+	}
+	src := "---\ntitle: A\ndate: 2026-01-02\n---\n" +
+		"```@num\nn: 1\n```\n\n- item\n\n  ```@num\n  n: 2\n  ```\n\n```@bare\n```\n\n```go\nx := 1\n```\n"
+	notes, err := LoadNotes(fstest.MapFS{"a.md": {Data: []byte(src)}}, "*.md", components)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := notes[0].Body.Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"<b>1</b>", "<li>\n<p>item</p>\n<b>2</b>", "<i>bare</i>", `<code class="language-go">`} {
+		if got := buf.String(); !strings.Contains(got, want) {
+			t.Errorf("got body %q, want %q", got, want)
+		}
+	}
+	if len(notes[0].Head) != 1 {
+		t.Errorf("got %d head components, want 1", len(notes[0].Head))
+	}
+
+	for name, body := range map[string]string{
+		"unknown":    "```@nope\n```\n",
+		"bad prop":   "```@num\nm: 1\n```\n",
+		"bad yaml":   "```@num\nn: [\n```\n",
+		"wrong type": "```@num\nn: x\n```\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			fsys := fstest.MapFS{"a.md": {Data: []byte("---\ntitle: A\ndate: 2026-01-02\n---\n" + body)}}
+			if _, err := LoadNotes(fsys, "*.md", components); err == nil {
+				t.Fatal("got nil error")
+			}
+		})
 	}
 }

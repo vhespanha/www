@@ -1,0 +1,16 @@
+package site
+
+import "strconv"
+
+// script loads the JavaScript module at src.
+templ script(src string) {
+	<script type="module" src={ src }></script>
+}
+
+templ counter(p counterProps) {
+	<figure class="demo">
+		<demo-counter start={ strconv.Itoa(p.Start) }>
+			<button type="button" disabled>Count: { strconv.Itoa(p.Start) }</button>
+		</demo-counter>
+	</figure>
+}
