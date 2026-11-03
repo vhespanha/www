@@ -15,7 +15,7 @@ import (
 
 func TestLoadNotes(t *testing.T) {
 	fsys := fstest.MapFS{
-		"notes/old.md":      {Data: []byte("---\ntitle: Old\ndate: 2025-01-02\n---\n# Heading\n\nNote[^1]\n\n[^1]: Text\n\n<aside>raw</aside>\n")},
+		"notes/old.md":      {Data: []byte("---\ntitle: Old\ndate: 2025-01-02\n---\n# Heading\n\nNote[^1]\n\n[^1]: Text\n\n<aside>raw</aside>\n\n\"Quote\" -- it's...\n")},
 		"notes/new.md":      {Data: []byte("---\r\ntitle: New\r\ndate: 2026-01-02\r\n---\r\nBody\r\n")},
 		"notes/ignored.txt": {Data: []byte("not a note")},
 	}
@@ -36,7 +36,7 @@ func TestLoadNotes(t *testing.T) {
 	if err := notes[1].Body.Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Heading</h1>", `class="footnotes"`, "<aside>raw</aside>"} {
+	for _, want := range []string{"Heading</h1>", `class="footnotes"`, "<aside>raw</aside>", "&ldquo;Quote&rdquo; &ndash; it&rsquo;s&hellip;"} {
 		if got := buf.String(); !strings.Contains(got, want) {
 			t.Errorf("got body %q, want %q", got, want)
 		}
