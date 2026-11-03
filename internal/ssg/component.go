@@ -34,19 +34,32 @@ type Component struct {
 // NewComponent returns a component that decodes its props into a P and
 // renders them with render. If head is not nil, it is added once to the head
 // of each page using the component, for example to load a script.
-func NewComponent[P any](render func(P) templ.Component, head templ.Component) Component {
+func NewComponent[P any](
+	render func(P) templ.Component,
+	head templ.Component,
+) Component {
 	return Component{
 		render: func(props []byte) (templ.Component, error) {
 			var p P
-			dec := yaml.NewDecoder(bytes.NewReader(props))
-			dec.KnownFields(true)
-			if err := dec.Decode(&p); err != nil && !errors.Is(err, io.EOF) {
-				return nil, fmt.Errorf("props: %w", err)
+			if err := decodeProps(props, &p); err != nil {
+				return nil, err
 			}
 			return render(p), nil
 		},
 		head: head,
 	}
+}
+
+// decodeProps unmarshals the YAML props into v, rejecting unknown fields. No
+// props leave v unchanged.
+func decodeProps(props []byte, v any) error {
+	dec := yaml.NewDecoder(bytes.NewReader(props))
+	dec.KnownFields(true)
+	err := dec.Decode(v)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("props: %w", err)
+	}
+	return nil
 }
 
 // componentUses records, while converting one note, the components it uses.
@@ -58,6 +71,20 @@ type componentUses struct {
 
 var usesKey = parser.NewContextKey()
 
+// add records that the note uses c, under name.
+func (u *componentUses) add(name string, c Component) {
+	if u.seen[name] {
+		return
+	}
+	if u.seen == nil {
+		u.seen = make(map[string]bool)
+	}
+	u.seen[name] = true
+	if c.head != nil {
+		u.heads = append(u.heads, c.head)
+	}
+}
+
 var kindComponent = ast.NewNodeKind("Component")
 
 // componentNode is a block replaced by a component's rendered HTML.
@@ -68,34 +95,36 @@ type componentNode struct {
 
 func (n *componentNode) Kind() ast.NodeKind { return kindComponent }
 
-func (n *componentNode) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
+func (n *componentNode) Dump(src []byte, level int) {
+	ast.DumpHelper(n, src, level, nil, nil)
+}
 
 // componentTransformer replaces fenced code blocks calling a component with
 // the component's HTML.
 type componentTransformer map[string]Component
 
-func (t componentTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+func (t componentTransformer) Transform(
+	doc *ast.Document,
+	reader text.Reader,
+	pc parser.Context,
+) {
 	uses := pc.Get(usesKey).(*componentUses)
 	src := reader.Source()
-	var blocks []*ast.FencedCodeBlock
-	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if b, ok := n.(*ast.FencedCodeBlock); ok && entering && strings.HasPrefix(string(b.Language(src)), "@") {
-			blocks = append(blocks, b)
-		}
-		return ast.WalkContinue, nil
-	})
-	for _, b := range blocks {
-		name := strings.TrimPrefix(string(b.Language(src)), "@")
-		html, err := t.render(uses, name, blockBody(b, src))
+	for _, b := range componentCalls(doc, src) {
+		name, _ := calledName(b, src)
+		html, err := t.render(name, blockBody(b, src))
 		if err != nil {
 			uses.err = fmt.Errorf("component %q: %w", name, err)
 			return
 		}
-		b.Parent().ReplaceChild(b.Parent(), b, &componentNode{html: html})
+		uses.add(name, t[name])
+		parent := b.Parent()
+		parent.ReplaceChild(parent, b, &componentNode{html: html})
 	}
 }
 
-func (t componentTransformer) render(uses *componentUses, name string, props []byte) ([]byte, error) {
+// render renders the component named name with the YAML props.
+func (t componentTransformer) render(name string, props []byte) ([]byte, error) {
 	c, ok := t[name]
 	if !ok {
 		return nil, errors.New("unknown component")
@@ -108,18 +137,35 @@ func (t componentTransformer) render(uses *componentUses, name string, props []b
 	if err := comp.Render(context.Background(), &buf); err != nil {
 		return nil, err
 	}
-	if !uses.seen[name] {
-		if uses.seen == nil {
-			uses.seen = make(map[string]bool)
-		}
-		uses.seen[name] = true
-		if c.head != nil {
-			uses.heads = append(uses.heads, c.head)
-		}
-	}
 	return buf.Bytes(), nil
 }
 
+// componentCalls returns the fenced code blocks in doc that call a component.
+// They are collected before any is replaced, so the walk never sees a changed
+// tree.
+func componentCalls(doc ast.Node, src []byte) []*ast.FencedCodeBlock {
+	var calls []*ast.FencedCodeBlock
+	walk := func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		b, ok := n.(*ast.FencedCodeBlock)
+		if !ok || !entering {
+			return ast.WalkContinue, nil
+		}
+		if _, ok := calledName(b, src); ok {
+			calls = append(calls, b)
+		}
+		return ast.WalkContinue, nil
+	}
+	_ = ast.Walk(doc, walk)
+	return calls
+}
+
+// calledName returns the name of the component that b calls, which its info
+// string gives after an "@", and whether it calls one at all.
+func calledName(b *ast.FencedCodeBlock, src []byte) (string, bool) {
+	return strings.CutPrefix(string(b.Language(src)), "@")
+}
+
+// blockBody returns the contents of b.
 func blockBody(b *ast.FencedCodeBlock, src []byte) []byte {
 	var body []byte
 	lines := b.Lines()
@@ -133,12 +179,21 @@ func blockBody(b *ast.FencedCodeBlock, src []byte) []byte {
 type componentRenderer struct{}
 
 func (componentRenderer) RegisterFuncs(r renderer.NodeRendererFuncRegisterer) {
-	r.Register(kindComponent, func(w util.BufWriter, _ []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if entering {
-			if _, err := w.Write(n.(*componentNode).html); err != nil {
-				return ast.WalkStop, err
-			}
-		}
-		return ast.WalkSkipChildren, nil
-	})
+	r.Register(kindComponent, renderComponent)
+}
+
+// renderComponent writes a componentNode's HTML.
+func renderComponent(
+	w util.BufWriter,
+	_ []byte,
+	n ast.Node,
+	entering bool,
+) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	if _, err := w.Write(n.(*componentNode).html); err != nil {
+		return ast.WalkStop, err
+	}
+	return ast.WalkSkipChildren, nil
 }

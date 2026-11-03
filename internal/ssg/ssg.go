@@ -185,7 +185,12 @@ type Note struct {
 // from the original; it may repeat that date but not change it. A translation
 // without an original or in an unknown language is an error, so that a typo in
 // a file name cannot silently drop content.
-func LoadNotes(fsys fs.FS, pattern string, components map[string]Component, langs ...string) ([]Note, error) {
+func LoadNotes(
+	fsys fs.FS,
+	pattern string,
+	components map[string]Component,
+	langs ...string,
+) ([]Note, error) {
 	names, err := fs.Glob(fsys, pattern)
 	if err != nil {
 		return nil, err
