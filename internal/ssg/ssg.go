@@ -257,7 +257,7 @@ var validSlug = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 func newMarkdown(components map[string]Component) goldmark.Markdown {
 	return goldmark.New(
-		goldmark.WithExtensions(extension.GFM, extension.Footnote),
+		goldmark.WithExtensions(extension.GFM, extension.Footnote, extension.Typographer),
 		goldmark.WithParserOptions(parser.WithASTTransformers(
 			util.Prioritized(componentTransformer(components), 100),
 		)),
