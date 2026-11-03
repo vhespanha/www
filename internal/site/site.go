@@ -61,9 +61,8 @@ func pages(fsys fs.FS, pattern string) ([]ssg.Page, error) {
 				continue
 			}
 			_, translated := noteIn(n, l.other())
-			add(page{l: l, path: path, translated: translated, head: text.Head}, func(p page) templ.Component {
-				return Note(p, text)
-			})
+			p := page{l: l, path: path, translated: translated, head: text.Head}
+			add(p, func(p page) templ.Component { return Note(p, text) })
 		}
 	}
 	return pages, nil

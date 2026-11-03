@@ -254,9 +254,14 @@ func TestLoadNotesComponents(t *testing.T) {
 			return templ.Raw("<i>bare</i>")
 		}, nil),
 	}
-	src := "---\ntitle: A\ndate: 2026-01-02\n---\n" +
-		"```@num\nn: 1\n```\n\n- item\n\n  ```@num\n  n: 2\n  ```\n\n```@bare\n```\n\n```go\nx := 1\n```\n"
-	notes, err := LoadNotes(fstest.MapFS{"a.md": {Data: []byte(src)}}, "*.md", components)
+	const front = "---\ntitle: A\ndate: 2026-01-02\n---\n"
+	src := front +
+		"```@num\nn: 1\n```\n\n" +
+		"- item\n\n  ```@num\n  n: 2\n  ```\n\n" +
+		"```@bare\n```\n\n" +
+		"```go\nx := 1\n```\n"
+	fsys := fstest.MapFS{"a.md": {Data: []byte(src)}}
+	notes, err := LoadNotes(fsys, "*.md", components)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +269,13 @@ func TestLoadNotesComponents(t *testing.T) {
 	if err := notes[0].Body.Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"<b>1</b>", "<li>\n<p>item</p>\n<b>2</b>", "<i>bare</i>", `<code class="language-go">`} {
+	wants := []string{
+		"<b>1</b>",
+		"<li>\n<p>item</p>\n<b>2</b>",
+		"<i>bare</i>",
+		`<code class="language-go">`,
+	}
+	for _, want := range wants {
 		if got := buf.String(); !strings.Contains(got, want) {
 			t.Errorf("got body %q, want %q", got, want)
 		}
@@ -280,7 +291,7 @@ func TestLoadNotesComponents(t *testing.T) {
 		"wrong type": "```@num\nn: x\n```\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			fsys := fstest.MapFS{"a.md": {Data: []byte("---\ntitle: A\ndate: 2026-01-02\n---\n" + body)}}
+			fsys := fstest.MapFS{"a.md": {Data: []byte(front + body)}}
 			if _, err := LoadNotes(fsys, "*.md", components); err == nil {
 				t.Fatal("got nil error")
 			}
