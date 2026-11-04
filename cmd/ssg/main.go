@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"go.vhespanha.dev/www/internal/site"
 	"go.vhespanha.dev/www/internal/ssg"
@@ -58,7 +59,7 @@ func usage() {
 }
 
 func build(out string) error {
-	pages, err := site.Pages()
+	pages, err := site.Pages(time.Now())
 	if err != nil {
 		return err
 	}

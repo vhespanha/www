@@ -33,13 +33,19 @@ type locale interface {
 	// other is the locale to offer as an alternative.
 	other() locale
 
+	// ogLocale is the locale in the form Open Graph expects, like "en_US".
+	ogLocale() string
+
 	homeTitle() string
+	homeDescription() string
+	jobTitle() string
 	role() string
 	openToRoles() string
 	email() string
 	intro() templ.Component
 
 	notesTitle() string
+	notesDescription() string
 	notesKicker() string
 	allNotes() string
 	readingTime(minutes int) string
@@ -49,6 +55,19 @@ type locale interface {
 
 	notFoundTitle() string
 	notFoundBody() templ.Component
+
+	privacyTitle() string
+	privacyDescription() string
+	privacyBody() templ.Component
+
+	// skipLink is the text of the link that skips to the main content.
+	skipLink() string
+	breadcrumbLabel() string
+	footerLabel() string
+	feedLink() string
+	feedTitle() string
+	feedDescription() string
+	ogImageAlt() string
 
 	languageLabel() string
 	// offerText, offerAccept and offerDismiss make up the prompt offered to

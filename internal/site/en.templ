@@ -12,14 +12,21 @@ func (english) tag() string   { return "en" }
 func (english) name() string  { return "English" }
 func (english) other() locale { return portuguese{} }
 
-func (english) homeTitle() string   { return "vhespanha" }
+func (english) ogLocale() string { return "en_US" }
+
+func (english) homeTitle() string { return "Vinicius Hespanha · Software Engineer" }
+func (english) homeDescription() string {
+	return "Software engineer in São Paulo, Brazil. I build small, understandable tools, mostly to understand how they work."
+}
+func (english) jobTitle() string    { return "Software Engineer" }
 func (english) role() string        { return "Software Engineer · São Paulo, Brazil" }
 func (english) openToRoles() string { return "Open to new roles. Get in touch." }
 func (english) email() string       { return "Email" }
 
-func (english) notesTitle() string  { return "Notes" }
-func (english) notesKicker() string { return "notes" }
-func (english) allNotes() string    { return "All notes" }
+func (english) notesTitle() string       { return "Notes" }
+func (english) notesDescription() string { return "Notes by Vinicius Hespanha." }
+func (english) notesKicker() string      { return "notes" }
+func (english) allNotes() string         { return "All notes" }
 
 func (english) readingTime(minutes int) string { return fmt.Sprintf("%d min read", minutes) }
 func (english) longDate(t time.Time) string    { return t.Format("2 January 2006") }
@@ -27,6 +34,21 @@ func (english) longDate(t time.Time) string    { return t.Format("2 January 2006
 func (english) inEnglish() string { return "in English" }
 
 func (english) notFoundTitle() string { return "Not found" }
+
+func (english) privacyTitle() string { return "Privacy" }
+func (english) privacyDescription() string {
+	return "How vhespanha.dev handles your data: no cookies, no analytics, no tracking."
+}
+
+func (english) skipLink() string        { return "Skip to content" }
+func (english) breadcrumbLabel() string { return "Breadcrumb" }
+func (english) footerLabel() string     { return "Site" }
+func (english) feedLink() string        { return "RSS feed" }
+func (english) feedTitle() string       { return "Vinicius Hespanha: Notes" }
+func (english) feedDescription() string { return "Notes by Vinicius Hespanha." }
+func (english) ogImageAlt() string {
+	return "Vinicius Hespanha, vhespanha.dev, beside a large ampersand."
+}
 
 func (english) languageLabel() string { return "Language" }
 func (english) offerText() string     { return "This page is also available in English." }
@@ -47,6 +69,41 @@ templ (english) intro() {
 
 templ (english) notFoundBody() {
 	<p>
-		There is nothing at this address. <a href="/">Go back</a>.
+		There is nothing at this address. <a href="/">Go to the home page</a>.
+	</p>
+}
+
+templ (english) privacyBody() {
+	<p class="meta">Last updated <time datetime="2026-11-03">3 November 2026</time></p>
+	<p>
+		This site has no cookies, analytics, advertising or tracking scripts, and
+		it loads nothing from other websites.
+	</p>
+	<h2>Your language choice</h2>
+	<p>
+		If you switch languages, or dismiss the suggestion to read a page in your
+		language, your browser remembers that choice in its local storage. It
+		never leaves your device, and clearing this site’s data in your browser
+		removes it.
+	</p>
+	<h2>Hosting</h2>
+	<p>
+		The site is hosted by Cloudflare, which processes technical data such as
+		your IP address, your browser and the pages you request in order to
+		deliver the site and protect it from abuse. Cloudflare handles that data
+		under <a href="https://www.cloudflare.com/privacypolicy/">its own privacy policy</a>.
+		I do not use it to identify or follow you.
+	</p>
+	<h2>Email</h2>
+	<p>
+		If you email me, I use your address and message only to reply, and keep
+		them only as long as the conversation needs.
+	</p>
+	<h2>Your rights</h2>
+	<p>
+		Laws such as Brazil’s LGPD and the EU’s GDPR give you rights over your
+		personal data, including to access and delete it. To exercise them, or to
+		ask anything about this policy, write to
+		<a href="mailto:mail@vhespanha.dev">mail@vhespanha.dev</a>.
 	</p>
 }

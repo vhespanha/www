@@ -1,25 +1,33 @@
 package site
 
 templ Index(p page, recent []noteItem, more bool) {
-	@document(p, p.l.homeTitle()) {
-		<main class="home">
+	@document(p, meta{
+		heading:     siteName,
+		title:       p.l.homeTitle(),
+		description: p.l.homeDescription(),
+		data: map[string]any{
+			"@type":      "ProfilePage",
+			"mainEntity": map[string]any{"@id": personID},
+		},
+	}) {
+		<main id="main" class="home">
 			@banner()
 			<header class="home-name">
-				<h1>Vinicius Hespanha</h1>
+				<h1 translate="no">{ siteName }</h1>
 				<p class="meta">{ p.l.role() }</p>
 				<div class="home-contact">
 					<p class="meta">{ p.l.openToRoles() }</p>
 					<p class="meta">
 						<a href="mailto:mail@vhespanha.dev">{ p.l.email() }</a> &middot;
-						<a href="https://github.com/vhespanha">GitHub</a>
+						<a href="https://github.com/vhespanha" translate="no">GitHub</a>
 					</p>
 				</div>
 			</header>
 			<div class="home-intro">
 				@p.l.intro()
 			</div>
-			<section class="home-notes">
-				<h2>{ p.l.notesTitle() }</h2>
+			<section id="notes" class="home-notes" aria-labelledby="notes-heading">
+				<h2 id="notes-heading">{ p.l.notesTitle() }</h2>
 				@noteList(p.l, recent)
 				if more {
 					<p><a href={ templ.URL(localeURL(p.l, "/notes/")) }>{ p.l.allNotes() }</a></p>

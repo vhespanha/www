@@ -7,7 +7,40 @@
     flex-direction: column;
   }
   li + li {
-    margin-top: var(--space-2);
+    margin-block-start: var(--space-2);
+  }
+}
+
+/* The breadcrumb trail heads the column of prose below it. */
+.site-header {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: var(--space-5) var(--gutter) 0;
+}
+:is(.site-header + .prose, .site-header + main > .prose) {
+  padding-block-start: var(--space-1);
+}
+
+.kicker {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li + li::before {
+    content: "/" / "";
+    margin-inline: 0.5em;
   }
 }
 
@@ -24,34 +57,21 @@
     margin-block: 0;
   }
   > * + * {
-    margin-top: var(--space-3);
+    margin-block-start: var(--space-3);
   }
   :is(p, li) {
     text-wrap: pretty;
   }
 
-  .kicker {
-    font-family: var(--font-sans);
-    font-size: 14px;
-    line-height: 24px;
-    font-weight: 500;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-  }
-  .kicker + h1 {
-    margin-top: var(--space-1);
-  }
-
   h1 + .meta {
-    margin-top: var(--space-2);
+    margin-block-start: var(--space-2);
   }
   .meta + * {
-    margin-top: var(--space-4);
+    margin-block-start: var(--space-4);
   }
 
   h2 {
-    margin-top: var(--space-4);
+    margin-block-start: var(--space-4);
 
     @media (width <= 480px) {
       font-size: 26px;
@@ -59,7 +79,7 @@
     }
   }
   :is(h2, h3) + * {
-    margin-top: var(--space-2);
+    margin-block-start: var(--space-2);
   }
 
   :is(strong, b) {
@@ -67,7 +87,7 @@
   }
 
   :is(ul, ol) {
-    padding-left: var(--indent);
+    padding-inline-start: var(--indent);
   }
   li::marker {
     color: var(--ink-muted);
@@ -78,14 +98,14 @@
 
   blockquote {
     margin-inline: 0;
-    padding-left: var(--indent);
+    padding-inline-start: var(--indent);
     font-style: italic;
 
     > * {
       margin-block: 0;
     }
     > * + * {
-      margin-top: var(--space-3);
+      margin-block-start: var(--space-3);
     }
     em {
       font-style: normal;
@@ -105,7 +125,7 @@
     font-family: var(--font-mono);
     font-size: calc(1rem - 2px);
     line-height: 28px;
-    padding-left: var(--indent);
+    padding-inline-start: var(--indent);
     overflow-x: auto;
     tab-size: 2;
   }
@@ -116,7 +136,7 @@
     color: var(--ink-muted);
   }
   .footnotes {
-    margin-top: var(--space-4);
+    margin-block-start: var(--space-4);
 
     hr {
       display: none;
@@ -126,7 +146,7 @@
       margin-block: 0;
     }
     li + li {
-      margin-top: var(--space-1);
+      margin-block-start: var(--space-1);
     }
   }
   figure {
@@ -140,7 +160,7 @@
     line-height: 24px;
   }
   figcaption {
-    margin-top: var(--space-1);
+    margin-block-start: var(--space-1);
   }
   :is(img, svg) {
     max-width: 100%;

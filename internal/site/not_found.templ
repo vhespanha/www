@@ -1,7 +1,7 @@
 package site
 
 templ NotFound(p page) {
-	@layout(p, p.l.notFoundTitle()) {
+	@layout(p, meta{heading: p.l.notFoundTitle(), crumbs: []crumb{homeCrumb(p.l)}}, false) {
 		<h1>{ p.l.notFoundTitle() }</h1>
 		@p.l.notFoundBody()
 	}

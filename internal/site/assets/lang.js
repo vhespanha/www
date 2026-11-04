@@ -45,12 +45,37 @@ document.addEventListener("click", (event) => {
 
 const other = document.querySelector("link[data-other]");
 if (!read(CHOICE) && !read(DISMISSED) && prefersOther(other)) {
-  const offer = document
-    .getElementById("lang-offer")
+  offer();
+}
+
+// offer shows the prompt to read this page in the other language. It is a
+// popover, whose button closes it by itself; browsers too old for popovers
+// are not offered anything.
+function offer() {
+  const aside = document
+    .getElementById("lang-offer-template")
     .content.firstElementChild.cloneNode(true);
-  offer.querySelector("button").addEventListener("click", () => {
+  if (!aside.showPopover) return;
+  const root = document.documentElement;
+  aside.addEventListener("toggle", (event) => {
+    if (event.newState !== "closed") return;
     write(DISMISSED, "1");
-    offer.remove();
+    aside.remove();
+    root.style.removeProperty("--offer-block-size");
   });
-  document.body.append(offer);
+  const button = aside.querySelector("button");
+  if (!("command" in button)) {
+    // Invoker commands are newer than popovers.
+    button.addEventListener("click", () => aside.hidePopover());
+  }
+  document.body.append(aside);
+  aside.showPopover();
+  // The page keeps room below its content for the offer, so that it never
+  // hides a focused link. See lang.css.
+  new ResizeObserver(([entry]) => {
+    root.style.setProperty(
+      "--offer-block-size",
+      `${entry.borderBoxSize[0].blockSize}px`,
+    );
+  }).observe(aside);
 }

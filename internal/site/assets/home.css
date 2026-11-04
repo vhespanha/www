@@ -28,7 +28,7 @@
   }
 
   h1 + .meta {
-    margin-top: var(--space-1);
+    margin-block-start: var(--space-1);
   }
 
   p {
@@ -36,33 +36,33 @@
   }
 
   .note-list {
-    margin-top: var(--space-2);
+    margin-block-start: var(--space-2);
 
     + p {
-      margin-top: var(--space-2);
+      margin-block-start: var(--space-2);
     }
   }
 }
 
 .home-name {
-  margin-top: var(--space-3);
+  margin-block-start: var(--space-3);
 }
 
 .home-contact {
-  margin-top: var(--space-2);
+  margin-block-start: var(--space-2);
 }
 
 .home-intro {
   max-width: var(--measure);
-  margin-top: var(--space-3);
+  margin-block-start: var(--space-3);
 
   p + p {
-    margin-top: var(--space-2);
+    margin-block-start: var(--space-2);
   }
 }
 
 .home-notes {
-  margin-top: var(--space-4);
+  margin-block-start: var(--space-4);
 }
 
 /* The notes hang from the slab's left edge: the slab is 208/480 of the banner. */
@@ -82,14 +82,14 @@
     grid-column: 1;
     grid-row: 1;
     align-self: end;
-    margin-top: 0;
+    margin-block-start: 0;
   }
 
   .home-intro {
     grid-column: 1;
     grid-row: 2;
     max-width: 22em;
-    margin-top: var(--space-4);
+    margin-block-start: var(--space-4);
   }
 
   .home-notes {

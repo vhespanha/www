@@ -12,14 +12,21 @@ func (portuguese) tag() string   { return "pt-BR" }
 func (portuguese) name() string  { return "Português" }
 func (portuguese) other() locale { return english{} }
 
-func (portuguese) homeTitle() string   { return "vhespanha" }
+func (portuguese) ogLocale() string { return "pt_BR" }
+
+func (portuguese) homeTitle() string { return "Vinicius Hespanha · Engenheiro de Software" }
+func (portuguese) homeDescription() string {
+	return "Engenheiro de software em São Paulo, Brasil. Construo ferramentas pequenas e compreensíveis, principalmente para entender como funcionam."
+}
+func (portuguese) jobTitle() string    { return "Engenheiro de Software" }
 func (portuguese) role() string        { return "Engenheiro de Software · São Paulo, Brasil" }
 func (portuguese) openToRoles() string { return "Em busca de novas oportunidades. Entre em contato." }
 func (portuguese) email() string       { return "E-mail" }
 
-func (portuguese) notesTitle() string  { return "Notas" }
-func (portuguese) notesKicker() string { return "notas" }
-func (portuguese) allNotes() string    { return "Todas as notas" }
+func (portuguese) notesTitle() string       { return "Notas" }
+func (portuguese) notesDescription() string { return "Notas de Vinicius Hespanha." }
+func (portuguese) notesKicker() string      { return "notas" }
+func (portuguese) allNotes() string         { return "Todas as notas" }
 
 func (portuguese) readingTime(minutes int) string { return fmt.Sprintf("%d min de leitura", minutes) }
 
@@ -40,6 +47,21 @@ func (portuguese) inEnglish() string { return "em inglês" }
 
 func (portuguese) notFoundTitle() string { return "Página não encontrada" }
 
+func (portuguese) privacyTitle() string { return "Privacidade" }
+func (portuguese) privacyDescription() string {
+	return "Como vhespanha.dev trata seus dados: sem cookies, sem analytics, sem rastreamento."
+}
+
+func (portuguese) skipLink() string        { return "Pular para o conteúdo" }
+func (portuguese) breadcrumbLabel() string { return "Trilha de navegação" }
+func (portuguese) footerLabel() string     { return "Site" }
+func (portuguese) feedLink() string        { return "Feed RSS" }
+func (portuguese) feedTitle() string       { return "Vinicius Hespanha: Notas" }
+func (portuguese) feedDescription() string { return "Notas de Vinicius Hespanha." }
+func (portuguese) ogImageAlt() string {
+	return "Vinicius Hespanha, vhespanha.dev, ao lado de um grande e comercial."
+}
+
 func (portuguese) languageLabel() string { return "Idioma" }
 func (portuguese) offerText() string     { return "Esta página também está disponível em português." }
 func (portuguese) offerAccept() string   { return "Ler em português" }
@@ -59,6 +81,41 @@ templ (portuguese) intro() {
 
 templ (portuguese) notFoundBody() {
 	<p>
-		Não há nada neste endereço. <a href="/pt/">Voltar</a>.
+		Não há nada neste endereço. <a href="/pt/">Ir para a página inicial</a>.
+	</p>
+}
+
+templ (portuguese) privacyBody() {
+	<p class="meta">Atualizado em <time datetime="2026-11-03">3 de novembro de 2026</time></p>
+	<p>
+		Este site não usa cookies, analytics, anúncios nem scripts de
+		rastreamento, e não carrega nada de outros sites.
+	</p>
+	<h2>Sua escolha de idioma</h2>
+	<p>
+		Se você troca de idioma, ou dispensa a sugestão de ler uma página no seu
+		idioma, seu navegador guarda essa escolha no armazenamento local. Ela
+		nunca sai do seu dispositivo, e apagar os dados deste site no navegador
+		a remove.
+	</p>
+	<h2>Hospedagem</h2>
+	<p>
+		O site é hospedado pela Cloudflare, que trata dados técnicos como seu
+		endereço IP, seu navegador e as páginas que você acessa para entregar o
+		site e protegê-lo contra abusos. A Cloudflare trata esses dados segundo
+		<a href="https://www.cloudflare.com/pt-br/privacypolicy/" hreflang="pt-BR">sua própria política de privacidade</a>.
+		Eu não os uso para identificar ou acompanhar você.
+	</p>
+	<h2>E-mail</h2>
+	<p>
+		Se você me escreve, uso seu endereço e sua mensagem apenas para
+		responder, e os guardo só pelo tempo que a conversa exigir.
+	</p>
+	<h2>Seus direitos</h2>
+	<p>
+		Leis como a LGPD e o GDPR europeu dão a você direitos sobre seus dados
+		pessoais, incluindo acessá-los e excluí-los. Para exercê-los, ou para
+		perguntar qualquer coisa sobre esta política, escreva para
+		<a href="mailto:mail@vhespanha.dev">mail@vhespanha.dev</a>.
 	</p>
 }

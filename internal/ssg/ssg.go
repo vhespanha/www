@@ -18,12 +18,12 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/evanw/esbuild/pkg/api"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 	"go.yaml.in/yaml/v3"
 )
@@ -36,12 +36,9 @@ type Page struct {
 	Content templ.Component
 }
 
-// stylesheet is the slash-separated path, within the assets, of the stylesheet
-// that imports all the others.
-const stylesheet = "assets/site.css"
-
 // Build replaces the contents of the directory out with the files of assets,
-// with their stylesheets bundled into one, and the rendered pages.
+// fingerprinted as described in [Asset] and with their stylesheets bundled
+// into one, and the rendered pages.
 func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 	if err := checkOut(out); err != nil {
 		return err
@@ -52,9 +49,11 @@ func Build(ctx context.Context, out string, pages []Page, assets fs.FS) error {
 	if err := os.CopyFS(out, assets); err != nil {
 		return err
 	}
-	if err := bundleCSS(filepath.Join(out, filepath.FromSlash(stylesheet))); err != nil {
+	urls, err := fingerprint(out)
+	if err != nil {
 		return err
 	}
+	ctx = context.WithValue(ctx, assetsKey{}, urls)
 	for _, p := range pages {
 		var buf bytes.Buffer
 		if err := p.Content.Render(ctx, &buf); err != nil {
@@ -98,40 +97,6 @@ func checkOut(out string) error {
 	return nil
 }
 
-// bundleCSS replaces the stylesheet at entry with a minified bundle of itself
-// and everything it imports, then removes the other stylesheets beside it,
-// which the bundle has made redundant. Fonts stay separate files.
-func bundleCSS(entry string) error {
-	res := api.Build(api.BuildOptions{
-		EntryPoints:      []string{entry},
-		Outfile:          entry,
-		Bundle:           true,
-		MinifyWhitespace: true,
-		MinifySyntax:     true,
-		External:         []string{"*.woff2"},
-		AllowOverwrite:   true,
-		Write:            true,
-		LogLevel:         api.LogLevelSilent,
-	})
-	if len(res.Errors) > 0 {
-		msgs := api.FormatMessages(res.Errors, api.FormatMessagesOptions{})
-		return fmt.Errorf("bundle css: %s", strings.Join(msgs, ""))
-	}
-	others, err := filepath.Glob(filepath.Join(filepath.Dir(entry), "*.css"))
-	if err != nil {
-		return err
-	}
-	for _, name := range others {
-		if name == entry {
-			continue
-		}
-		if err := os.Remove(name); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // clearDir empties dir, creating it if needed. It keeps dir itself so that
 // anything serving or watching it stays attached across rebuilds.
 func clearDir(dir string) error {
@@ -155,11 +120,17 @@ type Note struct {
 	// Slug is the name of the source file without its extension.
 	Slug  string
 	Title string
-	Date  time.Time
+	// Description summarises the note for search results and link previews.
+	// It is the front matter's description, or else the start of the note's
+	// first paragraph.
+	Description string
+	Date        time.Time
 	// Minutes is the estimated reading time, at least 1.
 	Minutes int
 	// Body is the note's markdown rendered to HTML.
 	Body templ.Component
+	// Source is the note's markdown, without its front matter.
+	Source []byte
 	// Head holds the head content of the components the note uses, once
 	// each, in order of first use.
 	Head []templ.Component
@@ -173,11 +144,12 @@ type Note struct {
 // Notes embed components by name, as described in [Component].
 //
 // Each original must start with a YAML front matter block setting title and
-// date:
+// date, and optionally description:
 //
 //	---
 //	title: Hello
 //	date: 2026-11-01
+//	description: A first note.
 //	---
 //
 // A file named hello.pt.md is the translation of hello.md into the language
@@ -260,6 +232,7 @@ func newMarkdown(components map[string]Component) goldmark.Markdown {
 		goldmark.WithExtensions(extension.GFM, extension.Footnote, extension.Typographer),
 		goldmark.WithParserOptions(parser.WithASTTransformers(
 			util.Prioritized(componentTransformer(components), 100),
+			util.Prioritized(headerScopes{}, 200),
 		)),
 		goldmark.WithRendererOptions(
 			html.WithUnsafe(),
@@ -274,8 +247,9 @@ func parseNote(md goldmark.Markdown, src []byte) (Note, error) {
 		return Note{}, err
 	}
 	var meta struct {
-		Title string    `yaml:"title"`
-		Date  time.Time `yaml:"date"`
+		Title       string    `yaml:"title"`
+		Date        time.Time `yaml:"date"`
+		Description string    `yaml:"description"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(front))
 	if err := dec.Decode(&meta); err != nil && !errors.Is(err, io.EOF) {
@@ -293,18 +267,25 @@ func parseNote(md goldmark.Markdown, src []byte) (Note, error) {
 	uses := new(componentUses)
 	pc := parser.NewContext()
 	pc.Set(usesKey, uses)
-	if err := md.Convert(body, &rendered, parser.WithContext(pc)); err != nil {
-		return Note{}, fmt.Errorf("markdown: %w", err)
-	}
+	doc := md.Parser().Parse(text.NewReader(body), parser.WithContext(pc))
 	if uses.err != nil {
 		return Note{}, uses.err
 	}
+	if err := md.Renderer().Render(&rendered, body, doc); err != nil {
+		return Note{}, fmt.Errorf("markdown: %w", err)
+	}
+	description := meta.Description
+	if description == "" {
+		description = excerpt(doc, body)
+	}
 	return Note{
-		Title:   meta.Title,
-		Date:    meta.Date,
-		Minutes: max(1, (len(bytes.Fields(body))+wordsPerMinute-1)/wordsPerMinute),
-		Body:    templ.Raw(rendered.String()),
-		Head:    uses.heads,
+		Title:       meta.Title,
+		Description: description,
+		Date:        meta.Date,
+		Minutes:     max(1, (len(bytes.Fields(body))+wordsPerMinute-1)/wordsPerMinute),
+		Body:        templ.Raw(rendered.String()),
+		Source:      bytes.TrimLeft(body, "\n"),
+		Head:        uses.heads,
 	}, nil
 }
 
