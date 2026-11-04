@@ -1,0 +1,60 @@
+{{- /*
+Cloudflare's _headers file: response headers by URL pattern. Every rule that
+matches a URL applies to it, and a header set by several rules has their values
+joined with commas, so the Link header of a page under a language prefix lists
+the feeds of both languages.
+*/ -}}
+/*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'none'; script-src 'self'{{range .ScriptHashes}} {{.}}{{end}}; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), browsing-topics=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), hid=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  No-Vary-Search: params=("utm_source" "utm_medium" "utm_campaign" "utm_content" "utm_term" "gclid" "fbclid" "msclkid" "mc_cid" "mc_eid" "ref"), key-order
+  Link: </llms.txt>; rel="describedby"; type="text/markdown", </sitemap.xml>; rel="sitemap"; type="application/xml", </.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json", {{template "feed-link" index .Locales 0}}
+
+{{/* Every file under /assets/ has a name that changes with its contents. */ -}}
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+{{/* Keep the workers.dev and preview URLs of the Worker out of search. */ -}}
+https://:worker.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
+
+/.well-known/api-catalog
+  Content-Type: application/linkset+json
+  Access-Control-Allow-Origin: *
+
+/llms.txt
+  Access-Control-Allow-Origin: *
+
+/llms-full.txt
+  Access-Control-Allow-Origin: *
+
+/sitemap.xml
+  Access-Control-Allow-Origin: *
+{{- range .Locales}}
+{{- if .Prefix}}
+
+{{.Prefix}}/*
+  Link: {{template "feed-link" .}}
+{{- end}}
+
+{{.Prefix}}/feed.xml
+  Content-Type: application/rss+xml; charset=utf-8
+  Access-Control-Allow-Origin: *
+
+{{.Prefix}}/notes/:slug/
+  Link: <{{.Prefix}}/notes/:slug.md>; rel="alternate"; type="text/markdown"
+
+{{.Prefix}}/notes/:slug.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+{{- end}}
+{{define "feed-link" -}}
+<{{.Prefix}}/feed.xml>; rel="alternate"; type="application/rss+xml"; hreflang="{{.Tag}}"
+{{- end}}

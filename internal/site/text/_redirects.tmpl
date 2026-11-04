@@ -1,0 +1,7 @@
+{{- /*
+Cloudflare's _redirects file. It sends each page's URL without its trailing
+slash to the page with a permanent redirect, where Cloudflare on its own would
+send a temporary one.
+*/ -}}
+{{range .}}{{.From}} {{.To}} 301
+{{end -}}
