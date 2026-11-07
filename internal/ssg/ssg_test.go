@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"unicode/utf8"
 
 	"github.com/a-h/templ"
 )
@@ -168,7 +171,18 @@ func TestBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pages := []Page{{Path: "notes/a/index.html", Content: templ.Raw("<p>a</p>")}}
+	link := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		u, err := Asset(ctx, "/assets/site.css")
+		if err != nil {
+			return err
+		}
+		_, err = io.WriteString(w, u)
+		return err
+	})
+	pages := []Page{
+		{Path: "notes/a/index.html", Content: templ.Raw("<p>a</p>")},
+		{Path: "link.txt", Content: link},
+	}
 	assets := fstest.MapFS{"assets/site.css": {Data: []byte("a{}")}}
 	if err := Build(context.Background(), out, pages, assets); err != nil {
 		t.Fatal(err)
@@ -181,16 +195,45 @@ func TestBuild(t *testing.T) {
 	if string(got) != "<p>a</p>" {
 		t.Errorf("got %q", got)
 	}
-	if _, err := os.Stat(filepath.Join(out, "assets", "site.css")); err != nil {
-		t.Errorf("asset not copied: %v", err)
+	u, err := os.ReadFile(filepath.Join(out, "link.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`^/assets/site\.[0-9a-f]{10}\.css$`).Match(u) {
+		t.Errorf("got asset URL %q, want a fingerprinted one", u)
+	}
+	if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(string(u)))); err != nil {
+		t.Errorf("fingerprinted asset missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "assets", "site.css")); !os.IsNotExist(err) {
+		t.Errorf("unfingerprinted asset left behind: %v", err)
 	}
 	if _, err := os.Stat(filepath.Dir(stale)); !os.IsNotExist(err) {
 		t.Errorf("stale output not removed: %v", err)
 	}
 }
 
+func TestBuildUnknownAsset(t *testing.T) {
+	page := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := Asset(ctx, "/assets/missing.js")
+		return err
+	})
+	err := Build(context.Background(), t.TempDir(), []Page{{Path: "a.html", Content: page}}, fstest.MapFS{})
+	if err == nil || !strings.Contains(err.Error(), "/assets/missing.js") {
+		t.Errorf("got error %v, want one naming the missing asset", err)
+	}
+}
+
+func TestAssetOutsideBuild(t *testing.T) {
+	if got, err := Asset(context.Background(), "/assets/a.js"); got != "/assets/a.js" || err != nil {
+		t.Errorf("got %q, %v; want the path unchanged", got, err)
+	}
+}
+
 func TestBuildBundlesCSS(t *testing.T) {
-	out := t.TempDir()
+	// A relative output directory, as the command line usually gives.
+	t.Chdir(t.TempDir())
+	out := "dist"
 	assets := fstest.MapFS{
 		"assets/site.css": {Data: []byte("@layer a, b;\n@import \"./base.css\";\n")},
 		"assets/base.css": {Data: []byte(`
@@ -206,6 +249,7 @@ func TestBuildBundlesCSS(t *testing.T) {
 @layer b {
   p {
     color: red;
+    background: url("data:image/gif;base64,R0lGODlhAQABAAAAACw=");
     & a {
       color: blue;
     }
@@ -218,7 +262,14 @@ func TestBuildBundlesCSS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(out, "assets", "site.css"))
+	sheets, err := filepath.Glob(filepath.Join(out, "assets", "*.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sheets) != 1 {
+		t.Fatalf("got stylesheets %v, want only the bundle", sheets)
+	}
+	got, err := os.ReadFile(sheets[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,19 +277,64 @@ func TestBuildBundlesCSS(t *testing.T) {
 	if !strings.HasPrefix(css, "@layer a,b;") {
 		t.Errorf("layer order not first: %q", css)
 	}
-	for _, want := range []string{"@view-transition{navigation:auto}", "url(fonts/f.woff2)", "& a{"} {
+	for _, want := range []string{"@view-transition{navigation:auto}", "url(data:image/gif", "& a{"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("got %q, want %q", css, want)
 		}
 	}
+	font := regexp.MustCompile(`url\((/assets/fonts/f\.[0-9a-f]{10}\.woff2)\)`).FindStringSubmatch(css)
+	if font == nil {
+		t.Fatalf("font URL not fingerprinted: %q", css)
+	}
 	if strings.Contains(css, "@import") {
 		t.Errorf("import not bundled: %q", css)
 	}
-	if _, err := os.Stat(filepath.Join(out, "assets", "base.css")); !os.IsNotExist(err) {
-		t.Errorf("imported stylesheet not removed: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(out, "assets", "fonts", "f.woff2")); err != nil {
+	if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(font[1]))); err != nil {
 		t.Errorf("font not copied: %v", err)
+	}
+}
+
+func TestBuildUnknownCSSURL(t *testing.T) {
+	assets := fstest.MapFS{"assets/site.css": {Data: []byte(`a{background:url("missing.png")}`)}}
+	if err := Build(context.Background(), t.TempDir(), nil, assets); err == nil {
+		t.Error("got nil error for a url() to a missing asset")
+	}
+}
+
+func TestLoadNotesMetadata(t *testing.T) {
+	long := strings.Repeat("word ", 40)
+	fsys := fstest.MapFS{
+		"set.md":     {Data: []byte("---\ntitle: A\ndate: 2026-01-02\ndescription: Given.\n---\nBody\n")},
+		"derived.md": {Data: []byte("---\ntitle: B\ndate: 2026-01-03\n---\n\n# Heading\n\nIt's *the* first[^1]\nparagraph <b>x</b>.\n\nSecond.\n\n[^1]: Note.\n")},
+		"long.md":    {Data: []byte("---\ntitle: C\ndate: 2026-01-04\n---\n" + long + "\n")},
+		"table.md":   {Data: []byte("---\ntitle: D\ndate: 2026-01-05\n---\n| a | b |\n|---|---|\n| 1 | 2 |\n")},
+	}
+	notes, err := LoadNotes(fsys, "*.md", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bySlug := make(map[string]Note)
+	for _, n := range notes {
+		bySlug[n.Slug] = n
+	}
+	if got := bySlug["set"].Description; got != "Given." {
+		t.Errorf("got description %q, want the front matter's", got)
+	}
+	if got, want := bySlug["derived"].Description, "It’s the first paragraph x."; got != want {
+		t.Errorf("got description %q, want %q", got, want)
+	}
+	if got := bySlug["long"].Description; utf8.RuneCountInString(got) > excerptLen+1 || !strings.HasSuffix(got, "word…") {
+		t.Errorf("got description %q, want one cut at a word", got)
+	}
+	if got := string(bySlug["set"].Source); got != "Body\n" {
+		t.Errorf("got source %q, want the markdown without front matter", got)
+	}
+	var buf bytes.Buffer
+	if err := bySlug["table"].Body.Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); strings.Count(got, `<th scope="col">`) != 2 {
+		t.Errorf("header cells lack scope: %q", got)
 	}
 }
 
