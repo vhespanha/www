@@ -1,0 +1,13 @@
+package site
+
+templ Privacy(p page) {
+	@layout(p, meta{
+		heading:     p.l.privacyTitle(),
+		description: p.l.privacyDescription(),
+		crumbs:      []crumb{homeCrumb(p.l)},
+	}, false) {
+		<h1>{ p.l.privacyTitle() }</h1>
+		<p class="meta">{ p.l.lastUpdated() } <time datetime={ isoDate(privacyUpdated) }>{ p.l.longDate(privacyUpdated) }</time></p>
+		@p.l.privacyBody()
+	}
+}

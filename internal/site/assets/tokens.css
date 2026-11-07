@@ -2,7 +2,8 @@
   color-scheme: light dark;
 
   --surface: light-dark(#f4f4f4, #121212);
-  --ink: contrast-color(var(--surface));
+  /* what contrast-color() picks, for browsers without it */
+  --ink: light-dark(#000, #fff);
   --ink-muted: color-mix(in oklab, var(--ink) 55%, var(--surface));
 
   --font-serif: "Crimson Pro Variable", "Iowan Old Style", Georgia, serif;
@@ -22,6 +23,12 @@
   --measure: 32em;
   --gutter: 24px;
   --indent: 1.25em;
+}
+
+@supports (color: contrast-color(red)) {
+  :root {
+    --ink: contrast-color(var(--surface));
+  }
 }
 
 @media (prefers-color-scheme: dark) {

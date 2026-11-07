@@ -1,0 +1,16 @@
+{{- /* The index of the site for language models. See llmstxt.org. */ -}}
+# {{siteName}}
+
+> Personal website of {{siteName}}, a software engineer in São Paulo, Brazil, with notes on building small, understandable software. Written in English, with some notes also in Brazilian Portuguese.
+
+Every note is also published as Markdown, at its URL with `.md` in place of the trailing slash.
+{{range .}}
+## {{.Title}} ({{.Language}})
+
+{{range .Notes}}- [{{.Title}}]({{.URL}}): {{.Description}}
+{{end}}{{end}}
+## Optional
+
+- [Home]({{origin}}/): Who I am and how to reach me.
+- [Privacy]({{origin}}/privacy/): How the site handles personal data.
+- [RSS feed]({{origin}}/feed.xml): New notes.

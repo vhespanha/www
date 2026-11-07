@@ -1,0 +1,22 @@
+{{- /* Cloudflare's _headers file: response headers by URL pattern. */ -}}
+/*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'
+  Referrer-Policy: strict-origin-when-cross-origin
+
+{{/* Every file under /assets/ has a name that changes with its contents. */ -}}
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+{{/* Keep the workers.dev and preview URLs of the Worker out of search. */ -}}
+https://:worker.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
+{{- range .}}
+
+{{.}}/feed.xml
+  Content-Type: application/rss+xml; charset=utf-8
+
+{{.}}/notes/:slug.md
+  Content-Type: text/markdown; charset=utf-8
+{{- end}}

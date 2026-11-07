@@ -2,9 +2,9 @@ package site
 
 import "strconv"
 
-// script loads the JavaScript module at src.
+// script loads the JavaScript module at the asset path src.
 templ script(src string) {
-	<script type="module" src={ src }></script>
+	<script type="module" src={ asset(ctx, src) }></script>
 }
 
 templ counter(p counterProps) {
