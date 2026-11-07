@@ -14,6 +14,8 @@ html {
   font-weight: var(--weight-regular);
   font-variant-numeric: oldstyle-nums proportional-nums;
   font-variant-ligatures: common-ligatures;
+  /* pages that scroll and pages that don't share one width */
+  scrollbar-gutter: stable;
 
   @media (width <= 480px) {
     font-size: 19px;
@@ -38,6 +40,27 @@ body {
 :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
+}
+
+/* Hidden until a keyboard user tabs to it, as the first stop on every page. */
+.skip-link {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-start: var(--space-1);
+  z-index: 1;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+
+  &:not(:focus) {
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
 }
 
 a {
@@ -90,4 +113,18 @@ h3 {
   color: var(--ink-muted);
   font-variant-numeric: lining-nums tabular-nums;
   hyphens: manual;
+}
+
+/* High contrast themes repaint the banner's two shapes in one colour, losing
+   the difference between them. */
+@media (forced-colors: active) {
+  .banner {
+    forced-color-adjust: none;
+  }
+  .banner-ink {
+    fill: CanvasText;
+  }
+  .banner-muted {
+    fill: GrayText;
+  }
 }

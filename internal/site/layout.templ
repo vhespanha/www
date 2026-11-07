@@ -1,97 +1,168 @@
 package site
 
-templ document(p page, title string) {
+templ document(p page, m meta) {
 	<!DOCTYPE html>
 	<html lang={ p.l.tag() }>
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>{ title }</title>
-			<link rel="preload" href="/assets/fonts/crimson-pro-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
-			<link rel="preload" href="/assets/fonts/jost-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
-			<link rel="icon" href="/assets/favicon-32.png" sizes="32x32"/>
-			<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
-			<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"/>
-			<link rel="stylesheet" href="/assets/site.css"/>
+			<title>{ m.documentTitle() }</title>
+			if m.description != "" {
+				<meta name="description" content={ m.description }/>
+			}
+			if p.path == "" {
+				<meta name="robots" content="noindex"/>
+			}
+			<meta name="color-scheme" content="light dark"/>
+			<meta name="theme-color" content="#f4f4f4" media="(prefers-color-scheme: light)"/>
+			<meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)"/>
+			<link rel="preload" href={ asset(ctx, "/assets/fonts/crimson-pro-latin-wght-normal.woff2") } as="font" type="font/woff2" crossorigin=""/>
+			<link rel="preload" href={ asset(ctx, "/assets/fonts/jost-latin-wght-normal.woff2") } as="font" type="font/woff2" crossorigin=""/>
+			<link rel="stylesheet" href={ asset(ctx, "/assets/site.css") }/>
+			<link rel="icon" href="/favicon.ico" sizes="32x32"/>
+			<link rel="icon" href={ asset(ctx, "/assets/favicon.svg") } type="image/svg+xml"/>
+			<link rel="apple-touch-icon" href={ asset(ctx, "/assets/apple-touch-icon.png") }/>
+			<link rel="alternate" type="application/rss+xml" title={ p.l.feedTitle() } href={ localeURL(p.l, "/feed.xml") }/>
+			<link rel="describedby" type="text/markdown" href="/llms.txt"/>
 			for _, h := range p.head {
 				@h
 			}
 			if p.path != "" {
-				<link rel="canonical" href={ origin + localeURL(p.l, p.path) }/>
+				<link rel="canonical" href={ p.canonical() }/>
+				if m.markdown != "" {
+					<link rel="alternate" type="text/markdown" href={ m.markdown }/>
+				}
+				@openGraph(p, m)
 			}
 			if p.translated {
-				<link rel="alternate" hreflang={ p.l.tag() } href={ origin + localeURL(p.l, p.path) }/>
+				<link rel="alternate" hreflang={ p.l.tag() } href={ p.canonical() }/>
 				<link rel="alternate" hreflang={ p.l.other().tag() } href={ origin + localeURL(p.l.other(), p.path) } data-other/>
 				<link rel="alternate" hreflang="x-default" href={ origin + p.path }/>
-				@languageRedirect()
-				<script src="/assets/lang.js" defer></script>
+				<script src={ asset(ctx, "/assets/lang.js") } defer></script>
 			}
+			@jsonLD(p, m)
 		</head>
 		<body>
+			<a class="skip-link" href="#main">{ p.l.skipLink() }</a>
 			{ children... }
+			@siteFooter(p)
 			if p.translated {
-				@languageSwitch(p)
 				@languageOffer(p)
 			}
 		</body>
 	</html>
 }
 
-templ layout(p page, title string) {
-	@document(p, title) {
-		<article class="prose">
-			{ children... }
-		</article>
+templ openGraph(p page, m meta) {
+	<meta property="og:site_name" content={ siteName }/>
+	<meta property="og:title" content={ m.heading }/>
+	if m.description != "" {
+		<meta property="og:description" content={ m.description }/>
+	}
+	<meta property="og:url" content={ p.canonical() }/>
+	<meta property="og:locale" content={ p.l.ogLocale() }/>
+	if p.translated {
+		<meta property="og:locale:alternate" content={ p.l.other().ogLocale() }/>
+	}
+	<meta property="og:image" content={ absAsset(ctx, ogImage) }/>
+	<meta property="og:image:width" content={ ogImageWidth }/>
+	<meta property="og:image:height" content={ ogImageHeight }/>
+	<meta property="og:image:alt" content={ p.l.ogImageAlt() }/>
+	<meta name="twitter:card" content="summary_large_image"/>
+	if m.published.IsZero() {
+		<meta property="og:type" content="website"/>
+	} else {
+		<meta property="og:type" content="article"/>
+		<meta property="article:published_time" content={ isoDate(m.published) }/>
+		<meta property="article:author" content={ origin + "/" }/>
 	}
 }
 
-// languageRedirect sends a reader who explicitly chose the other language to
-// this page in that language. It only acts when arriving from elsewhere, so it
-// never overrides a link followed within the site or traps the back button. It
-// is inline so that it runs before the first paint. The rest of the behaviour
-// lives in lang.js.
-templ languageRedirect() {
-	<script>
-		(function () {
-			try {
-				var other = document.querySelector("link[data-other]");
-				if (localStorage.getItem("lang") !== other.hreflang) return;
-				var nav = performance.getEntriesByType("navigation")[0];
-				if (nav && nav.type !== "navigate") return;
-				if (document.referrer && new URL(document.referrer).origin === location.origin) return;
-				location.replace(new URL(other.href).pathname + location.search + location.hash);
-			} catch (e) {}
-		})();
-	</script>
+// layout is the frame of the pages that are a column of prose. It wraps their
+// content in <main>, unless article is set, in which case the content is an
+// <article> inside it.
+templ layout(p page, m meta, article bool) {
+	@document(p, m) {
+		@siteHeader(p, m.crumbs)
+		if article {
+			<main id="main">
+				<article class="prose">
+					{ children... }
+				</article>
+			</main>
+		} else {
+			<main id="main" class="prose">
+				{ children... }
+			</main>
+		}
+	}
 }
 
-// languageSwitch is a plain link, so it works without JavaScript. lang.js saves
-// the choice when it is followed.
-templ languageSwitch(p page) {
+// siteHeader holds the breadcrumb trail, the pages above this one. The page
+// itself is left out, since its heading follows.
+templ siteHeader(p page, crumbs []crumb) {
+	<header class="site-header">
+		<nav class="kicker" aria-label={ p.l.breadcrumbLabel() }>
+			<ol class="breadcrumb">
+				for _, c := range crumbs {
+					if c.brand {
+						<li><a href={ templ.URL(c.href) } translate="no">{ c.label }</a></li>
+					} else {
+						<li><a href={ templ.URL(c.href) }>{ c.label }</a></li>
+					}
+				}
+			</ol>
+		</nav>
+	</header>
+}
+
+// siteFooter links to the pages every page offers. The language link is a
+// plain link, so it works without JavaScript; lang.js saves the choice when
+// it is followed.
+templ siteFooter(p page) {
 	<footer class="site-footer">
-		<nav class="meta" aria-label={ p.l.languageLabel() }>
-			<a
-				href={ templ.URL(localeURL(p.l.other(), p.path)) }
-				hreflang={ p.l.other().tag() }
-				lang={ p.l.other().tag() }
-				data-lang-choice
-			>{ p.l.other().name() }</a>
+		<nav class="meta" aria-label={ p.l.footerLabel() }>
+			<ul class="footer-links">
+				if p.translated {
+					<li>
+						<a
+							href={ templ.URL(localeURL(p.l.other(), p.path)) }
+							hreflang={ p.l.other().tag() }
+							lang={ p.l.other().tag() }
+							data-lang-choice
+						>{ p.l.other().name() }</a>
+					</li>
+				}
+				<li><a href={ templ.URL(localeURL(p.l, "/feed.xml")) } type="application/rss+xml">{ p.l.feedLink() }</a></li>
+				<li><a href={ templ.URL(localeURL(p.l, "/privacy/")) }>{ p.l.privacyTitle() }</a></li>
+			</ul>
 		</nav>
 	</footer>
 }
 
 // languageOffer is the prompt lang.js shows to readers whose browser prefers the
 // other language. It is written in that language, since that is the one they
-// are known to read.
+// are known to read. It is a popover, so the browser keeps it above the page
+// and closes it from its button without any script.
 templ languageOffer(p page) {
 	{{ other := p.l.other() }}
-	<template id="lang-offer">
-		<aside class="lang-offer meta" lang={ other.tag() } aria-label={ other.languageLabel() }>
+	<template id="lang-offer-template">
+		<aside id="lang-offer" class="lang-offer meta" popover="manual" lang={ other.tag() } aria-label={ other.languageLabel() }>
 			<p>{ other.offerText() }</p>
 			<p class="lang-offer-actions">
 				<a href={ templ.URL(localeURL(other, p.path)) } hreflang={ other.tag() } data-lang-choice>{ other.offerAccept() }</a>
-				<button type="button">{ other.offerDismiss() }</button>
+				<button type="button" commandfor="lang-offer" command="hide-popover">{ other.offerDismiss() }</button>
 			</p>
 		</aside>
 	</template>
+}
+
+templ jsonLD(p page, m meta) {
+	{{ data, err := structuredData(ctx, p, m) }}
+	if err != nil {
+		{{ return err }}
+	}
+	if data != nil {
+		@templ.JSONScript("", data).WithType("application/ld+json")
+	}
 }

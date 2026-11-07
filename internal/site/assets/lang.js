@@ -2,12 +2,10 @@
 // everything it needs comes from the page: the alternate URL from <link>, the
 // text from <template>. The site works in full without it.
 //
-// "lang" holds a language the reader explicitly chose. Dismissing the offer is
-// kept apart from it, since declining a prompt does not ask to be redirected
-// away from links in the other language later.
+// DONE is set once the reader has chosen a language or dismissed the offer,
+// after which it is never shown again.
 
-const CHOICE = "lang";
-const DISMISSED = "lang-offer-dismissed";
+const DONE = "lang-offer-done";
 
 function read(key) {
   try {
@@ -40,17 +38,42 @@ function prefersOther(other) {
 
 document.addEventListener("click", (event) => {
   const choice = event.target.closest("a[data-lang-choice]");
-  if (choice) write(CHOICE, choice.hreflang);
+  if (choice) write(DONE, "1");
 });
 
 const other = document.querySelector("link[data-other]");
-if (!read(CHOICE) && !read(DISMISSED) && prefersOther(other)) {
-  const offer = document
-    .getElementById("lang-offer")
+if (!read(DONE) && prefersOther(other)) {
+  offer();
+}
+
+// offer shows the prompt to read this page in the other language. It is a
+// popover, whose button closes it by itself; browsers too old for popovers
+// are not offered anything.
+function offer() {
+  const aside = document
+    .getElementById("lang-offer-template")
     .content.firstElementChild.cloneNode(true);
-  offer.querySelector("button").addEventListener("click", () => {
-    write(DISMISSED, "1");
-    offer.remove();
+  if (!aside.showPopover) return;
+  const root = document.documentElement;
+  aside.addEventListener("toggle", (event) => {
+    if (event.newState !== "closed") return;
+    write(DONE, "1");
+    aside.remove();
+    root.style.removeProperty("--offer-block-size");
   });
-  document.body.append(offer);
+  const button = aside.querySelector("button");
+  if (!("command" in button)) {
+    // Invoker commands are newer than popovers.
+    button.addEventListener("click", () => aside.hidePopover());
+  }
+  document.body.append(aside);
+  aside.showPopover();
+  // The page keeps room below its content for the offer, so that it never
+  // hides a focused link. See lang.css.
+  new ResizeObserver(([entry]) => {
+    root.style.setProperty(
+      "--offer-block-size",
+      `${entry.borderBoxSize[0].blockSize}px`,
+    );
+  }).observe(aside);
 }

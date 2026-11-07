@@ -3,15 +3,25 @@ package site
 import "go.vhespanha.dev/www/internal/ssg"
 
 templ Notes(p page, notes []noteItem) {
-	@layout(p, p.l.notesTitle()) {
+	@layout(p, meta{
+		heading:     p.l.notesTitle(),
+		description: p.l.notesDescription(),
+		crumbs:      []crumb{homeCrumb(p.l)},
+	}, false) {
 		<h1>{ p.l.notesTitle() }</h1>
 		@noteList(p.l, notes)
 	}
 }
 
+// Note is the page of the note n.
 templ Note(p page, n ssg.Note) {
-	@layout(p, n.Title) {
-		<p class="kicker">{ p.l.notesKicker() }</p>
+	@layout(p, meta{
+		heading:     n.Title,
+		description: n.Description,
+		published:   n.Date,
+		markdown:    markdownURL(p),
+		crumbs:      []crumb{homeCrumb(p.l), {label: p.l.notesKicker(), href: p.notes}},
+	}, true) {
 		<h1>{ n.Title }</h1>
 		<p class="meta">
 			<time datetime={ isoDate(n.Date) }>{ p.l.longDate(n.Date) }</time> &middot; { p.l.readingTime(n.Minutes) }

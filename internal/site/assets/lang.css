@@ -3,7 +3,7 @@
   padding-inline: var(--gutter);
   padding-block-end: var(--space-3);
 }
-.prose + .site-footer {
+:is(.prose, main:has(> .prose)) + .site-footer {
   max-width: var(--measure);
   margin-inline: auto;
   margin-block-start: calc(var(--space-4) * -1);
@@ -18,8 +18,24 @@
   }
 }
 
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li + li::before {
+    content: "·" / "";
+    margin-inline: 0.5em;
+  }
+}
+
+/* A popover in the top layer: reset the browser's centring before placing it. */
 .lang-offer {
   position: fixed;
+  inset: auto;
+  margin: 0;
   inset-block-end: var(--space-2);
   inset-inline-end: var(--space-2);
   max-width: min(22em, 100vw - 2 * var(--space-2));
@@ -56,4 +72,14 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-block-start: var(--space-1);
+}
+
+/* While the offer is open, the page keeps room for it below its content, and
+   scrolling to a focused element stops above it, so it never hides one. */
+:root:has(.lang-offer:popover-open) {
+  scroll-padding-block-end: calc(var(--offer-block-size, 0px) + 2 * var(--space-2));
+
+  body {
+    padding-block-end: calc(var(--offer-block-size, 0px) + 2 * var(--space-2));
+  }
 }
